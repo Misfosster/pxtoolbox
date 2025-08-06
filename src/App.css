@@ -1,0 +1,92 @@
+@import '@blueprintjs/core/lib/css/blueprint.css';
+@import '@blueprintjs/icons/lib/css/blueprint-icons.css';
+
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: #293742;
+  color: #f5f8fa;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+.main-container {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.home-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.welcome-card {
+  text-align: center;
+  padding: 40px 20px;
+}
+
+.status-card, .tech-card {
+  padding: 20px;
+}
+
+.status-card ul, .tech-card ul {
+  margin: 15px 0;
+  padding-left: 20px;
+}
+
+.status-card li, .tech-card li {
+  margin: 8px 0;
+}
+
+/* Tool development styles */
+.tool-container {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tool-header {
+  padding: 20px;
+  text-align: center;
+}
+
+.tool-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.tool-section {
+  margin-bottom: 20px;
+}
+
+.tool-input, .tool-output {
+  margin-bottom: 15px;
+}
+
+.copy-button {
+  margin-top: 10px;
+}
+
+@media (max-width: 768px) {
+  .main-container {
+    padding: 10px;
+  }
+  
+  .welcome-card {
+    padding: 20px 15px;
+  }
+  
+  .tool-header {
+    padding: 15px;
+  }
+}
