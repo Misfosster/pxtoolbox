@@ -1,7 +1,7 @@
 import React from 'react';
 import { Card, H3, Classes } from '@blueprintjs/core';
 
-interface ToolTemplateProps {
+export interface ToolTemplateProps {
   title: string;
   description: string;
   children: React.ReactNode;

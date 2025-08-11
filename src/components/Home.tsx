@@ -44,7 +44,7 @@ const Home: React.FC = () => {
           <Button 
             intent={Intent.PRIMARY} 
             icon="code"
-            onClick={() => window.open('https://github.com', '_blank')}
+            onClick={() => window.open('https://misfosster.github.io/pxtoolbox/', '_blank')}
           >
             View on GitHub
           </Button>
