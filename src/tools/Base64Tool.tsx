@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Button, ButtonGroup, Card, FormGroup, H3, Intent, TextArea, Tooltip } from '@blueprintjs/core';
+import { Button, ButtonGroup, Card, FormGroup, H3, Intent, TextArea } from '@blueprintjs/core';
 import ToolTemplate from '../components/ToolTemplate';
 
 type Mode = 'encode' | 'decode';
@@ -48,6 +48,8 @@ const Base64Tool: React.FC = () => {
   const [mode, setMode] = useState<Mode>('encode');
   const [input, setInput] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [copyInputStatus, setCopyInputStatus] = useState<'idle' | 'success'>('idle');
+  const [copyOutputStatus, setCopyOutputStatus] = useState<'idle' | 'success'>('idle');
 
   const output = useMemo(() => {
     if (!input) {
@@ -65,11 +67,16 @@ const Base64Tool: React.FC = () => {
     }
   }, [input, mode]);
 
-  async function copyToClipboard(text: string) {
+  async function copyToClipboard(text: string, target: 'input' | 'output') {
+    const setStatus = target === 'input' ? setCopyInputStatus : setCopyOutputStatus;
     try {
       await navigator.clipboard.writeText(text);
+      setStatus('success');
     } catch {
-      // ignore
+      // ignore errors; keep idle state
+    } finally {
+      // reset after brief feedback window
+      setTimeout(() => setStatus('idle'), 1500);
     }
   }
 
@@ -110,11 +117,14 @@ const Base64Tool: React.FC = () => {
           />
         </FormGroup>
         <ButtonGroup>
-          <Tooltip content="Copy input">
-            <Button icon="duplicate" onClick={() => copyToClipboard(input)} disabled={!input}>
-              Copy input
-            </Button>
-          </Tooltip>
+          <Button
+            icon={copyInputStatus === 'success' ? 'tick' : 'duplicate'}
+            intent={copyInputStatus === 'success' ? Intent.SUCCESS : Intent.NONE}
+            onClick={() => copyToClipboard(input, 'input')}
+            disabled={!input}
+          >
+            {copyInputStatus === 'success' ? 'Copied' : 'Copy input'}
+          </Button>
           <Button icon="eraser" onClick={() => setInput('')} disabled={!input}>
             Clear
           </Button>
@@ -131,11 +141,14 @@ const Base64Tool: React.FC = () => {
           <TextArea id="b64-output" value={output} readOnly fill large style={{ height: 140 }} />
         </FormGroup>
         <ButtonGroup>
-          <Tooltip content="Copy output">
-            <Button icon="clipboard" intent={Intent.PRIMARY} onClick={() => copyToClipboard(output)} disabled={!output || !!error}>
-              Copy output
-            </Button>
-          </Tooltip>
+          <Button
+            icon={copyOutputStatus === 'success' ? 'tick' : 'clipboard'}
+            intent={copyOutputStatus === 'success' ? Intent.SUCCESS : Intent.PRIMARY}
+            onClick={() => copyToClipboard(output, 'output')}
+            disabled={!output || !!error}
+          >
+            {copyOutputStatus === 'success' ? 'Copied' : 'Copy output'}
+          </Button>
         </ButtonGroup>
       </Card>
     </ToolTemplate>
