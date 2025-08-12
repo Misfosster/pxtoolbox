@@ -1,13 +1,24 @@
 import React from 'react';
-import { Card, H3, Classes } from '@blueprintjs/core';
+import { Card, H3, Classes, Button } from '@blueprintjs/core';
+import { useNavigate } from 'react-router-dom';
 import ToolTab from './ToolTab';
 
 const ToolsHub: React.FC = () => {
+  const navigate = useNavigate();
   return (
     <ToolTab title="Tools" description="Browse and launch available tools">
       <Card elevation={1}>
         <H3>Tool index</H3>
-        <p className={Classes.TEXT_MUTED}>No tools published yet. Coming soon.</p>
+        <ul>
+          <li>
+            <Button icon="exchange" onClick={() => navigate('/tools/base64')}>
+              Base64 Encoder/Decoder
+            </Button>
+            <span className={Classes.TEXT_MUTED} style={{ marginLeft: 8 }}>
+              Convert text to/from Base64
+            </span>
+          </li>
+        </ul>
       </Card>
     </ToolTab>
   );
