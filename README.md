@@ -1,10 +1,13 @@
 # PX Toolbox
 
-A developer utilities platform built for incremental development during William's internship at Pernexus. This is the base project ready for adding tools one by one.
+A developer utilities platform built for incremental development during William's internship. This is the base project ready for adding tools one by one.
 
 ## Current Status
 
-🚧 **Base Project Ready** - The foundation is set up and ready for tool development!
+**Base project ready** and first tool implemented.
+
+### Implemented
+- **Base64 Encoder/Decoder**: Encode/decode with Base64URL support, auto-padding, whitespace tolerance, copy buttons, and clear error states. Route: `/#/tools/base64`.
 
 ### Planned Features
 - **JWT Token Decoder**: Decode and inspect JWT tokens
@@ -59,6 +62,30 @@ npm run format
 npm run lint
 ```
 
+## Testing
+
+### End-to-End tests (Playwright)
+
+Local run with the same setup CI uses (serves the production build at port 4173):
+
+```bash
+# Build once
+npm run build
+
+# Run tests (starts preview server automatically on port 4173)
+npm run test:e2e
+```
+
+Details:
+- Preview server command: `npm run preview:ci` (strict port 4173)
+- Base URL for tests: `http://localhost:4173` (configured in `playwright.config.ts`)
+- Tests are located in `tests/`
+- HTML report output: `playwright-report/` (opened manually if needed)
+
+Troubleshooting:
+- If the port is in use, stop existing preview servers or change the port in `playwright.config.ts`.
+- If tests fail to find routes, ensure the app is using hash routing and navigate via `/#/...` paths in tests.
+
 ## Deployment
 
 ### GitHub Pages (Project Site)
@@ -77,7 +104,7 @@ If forking or renaming:
 - The workflow passes `REPO_NAME=${{ github.event.repository.name }}` to ensure the correct base path
 
 ### Internal Hosting
-The `dist/` output can be served by any static file server (e.g., PX build01). No backend required.
+The `dist/` output can be served by any static file server. No backend required.
 
 ## Available Tools
 
@@ -89,4 +116,4 @@ MIT License - See LICENSE file for details.
 
 ## Contributing
 
-This project was developed during William's internship at Pernexus. It serves as both a useful tool suite and a portfolio piece demonstrating modern React/TypeScript development practices.
+This project was developed during William's internship. It serves as both a useful tool suite and a portfolio piece demonstrating modern React/TypeScript development practices.
