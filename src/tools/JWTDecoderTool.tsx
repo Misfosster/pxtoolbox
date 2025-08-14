@@ -115,7 +115,7 @@ const JWTDecoderTool: React.FC = () => {
           intent={error ? Intent.DANGER : Intent.NONE}
         >
           <div style={{ position: 'relative' }}>
-            <TextArea id="jwt-header" value={headerPretty} readOnly fill large style={{ height: 120, paddingRight: 40, resize: 'none' }} />
+            <TextArea id="jwt-header" value={headerPretty} readOnly fill large style={{ height: 120, paddingRight: 40, resize: 'none', pointerEvents: 'none' }} />
             <div style={{ position: 'absolute', right: 8, bottom: 8 }}>
               <Button
                 icon={copyHeaderStatus === 'success' ? 'tick' : 'clipboard'}
@@ -132,7 +132,7 @@ const JWTDecoderTool: React.FC = () => {
         </FormGroup>
         <FormGroup label="Payload" labelFor="jwt-payload">
           <div style={{ position: 'relative' }}>
-            <TextArea id="jwt-payload" value={payloadPretty} readOnly fill large style={{ height: 160, paddingRight: 40, resize: 'none' }} />
+            <TextArea id="jwt-payload" value={payloadPretty} readOnly fill large style={{ height: 160, paddingRight: 40, resize: 'none', pointerEvents: 'none' }} />
             <div style={{ position: 'absolute', right: 8, bottom: 8 }}>
               <Button
                 icon={copyPayloadStatus === 'success' ? 'tick' : 'clipboard'}
@@ -149,7 +149,7 @@ const JWTDecoderTool: React.FC = () => {
         </FormGroup>
         <FormGroup label="Signature (raw)" labelFor="jwt-signature">
           <div style={{ position: 'relative' }}>
-            <TextArea id="jwt-signature" value={signatureText} readOnly fill large style={{ height: 60, paddingRight: 40, resize: 'none' }} />
+            <TextArea id="jwt-signature" value={signatureText} readOnly fill large style={{ height: 60, paddingRight: 40, resize: 'none', pointerEvents: 'none' }} />
             <div style={{ position: 'absolute', right: 8, bottom: 8 }}>
               <Button
                 icon={copySignatureStatus === 'success' ? 'tick' : 'clipboard'}

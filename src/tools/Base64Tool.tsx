@@ -138,7 +138,7 @@ const Base64Tool: React.FC = () => {
           helperText={error ?? undefined}
           intent={error ? Intent.DANGER : Intent.NONE}
         >
-          <TextArea id="b64-output" value={output} readOnly fill large style={{ height: 140, resize: 'none' }} />
+          <TextArea id="b64-output" value={output} readOnly fill large style={{ height: 140, resize: 'none', pointerEvents: 'none' }} />
         </FormGroup>
         <ButtonGroup>
           <Button
