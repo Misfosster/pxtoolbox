@@ -113,7 +113,7 @@ const Base64Tool: React.FC = () => {
             fill
             value={input}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
-            style={{ height: 140 }}
+            style={{ height: 140, resize: 'none' }}
           />
         </FormGroup>
         <ButtonGroup>
@@ -138,7 +138,7 @@ const Base64Tool: React.FC = () => {
           helperText={error ?? undefined}
           intent={error ? Intent.DANGER : Intent.NONE}
         >
-          <TextArea id="b64-output" value={output} readOnly fill large style={{ height: 140 }} />
+          <TextArea id="b64-output" value={output} readOnly fill large style={{ height: 140, resize: 'none' }} />
         </FormGroup>
         <ButtonGroup>
           <Button
