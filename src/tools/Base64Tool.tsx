@@ -1,8 +1,6 @@
-import React, { useMemo, useState } from 'react';
-import { Button, ButtonGroup, Card, FormGroup, H3, Intent, TextArea } from '@blueprintjs/core';
+import React, { useState } from 'react';
+import { Button, ButtonGroup, Card, FormGroup, Intent, TextArea } from '@blueprintjs/core';
 import ToolTemplate from '../components/ToolTemplate';
-
-type Mode = 'encode' | 'decode';
 
 function encodeToBase64(input: string): string {
   const encoder = new TextEncoder();
@@ -45,27 +43,11 @@ function decodeFromBase64(b64: string): string {
 }
 
 const Base64Tool: React.FC = () => {
-  const [mode, setMode] = useState<Mode>('encode');
-  const [input, setInput] = useState<string>('');
+  const [leftText, setLeftText] = useState<string>('');
+  const [rightText, setRightText] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
   const [copyInputStatus, setCopyInputStatus] = useState<'idle' | 'success'>('idle');
   const [copyOutputStatus, setCopyOutputStatus] = useState<'idle' | 'success'>('idle');
-
-  const output = useMemo(() => {
-    if (!input) {
-      setError(null);
-      return '';
-    }
-    try {
-      const result = mode === 'encode' ? encodeToBase64(input) : decodeFromBase64(input);
-      setError(null);
-      return result;
-    } catch (e) {
-      const message = mode === 'encode' ? 'Failed to encode input.' : 'Invalid Base64 input.';
-      setError(message);
-      return '';
-    }
-  }, [input, mode]);
 
   async function copyToClipboard(text: string, target: 'input' | 'output') {
     const setStatus = target === 'input' ? setCopyInputStatus : setCopyOutputStatus;
@@ -80,77 +62,101 @@ const Base64Tool: React.FC = () => {
     }
   }
 
+  function handleLeftChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const newLeft = e.target.value;
+    setLeftText(newLeft);
+    if (!newLeft) {
+      setRightText('');
+      setError(null);
+      return;
+    }
+    try {
+      const encoded = encodeToBase64(newLeft);
+      setRightText(encoded);
+      setError(null);
+    } catch {
+      setRightText('');
+      setError('Failed to encode input.');
+    }
+  }
+
+  function handleRightChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const newRight = e.target.value;
+    setRightText(newRight);
+    if (!newRight) {
+      setLeftText('');
+      setError(null);
+      return;
+    }
+    try {
+      const decoded = decodeFromBase64(newRight);
+      setLeftText(decoded);
+      setError(null);
+    } catch {
+      setLeftText('');
+      setError('Invalid Base64 input.');
+    }
+  }
+
   return (
     <ToolTemplate title="Base64 Encoder/Decoder" description="Convert text to and from Base64 (supports Base64URL, missing padding, and whitespace). All processing happens locally in your browser.">
-      <Card elevation={1} style={{ marginBottom: 16 }}>
-        <H3 style={{ marginTop: 0 }}>Mode</H3>
-        <ButtonGroup minimal>
-          <Button
-            active={mode === 'encode'}
-            intent={mode === 'encode' ? Intent.PRIMARY : Intent.NONE}
-            icon="arrow-up"
-            onClick={() => setMode('encode')}
-          >
-            Encode (text → Base64)
-          </Button>
-          <Button
-            active={mode === 'decode'}
-            intent={mode === 'decode' ? Intent.PRIMARY : Intent.NONE}
-            icon="arrow-down"
-            onClick={() => setMode('decode')}
-          >
-            Decode (Base64 → text)
-          </Button>
-        </ButtonGroup>
-      </Card>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
+        <Card elevation={1}>
+          <FormGroup label="Text" labelFor="b64-input">
+            <TextArea
+              id="b64-input"
+              placeholder="Type or paste text…"
+              large
+              fill
+              value={leftText}
+              onChange={handleLeftChange}
+              style={{ height: 160, resize: 'none' }}
+            />
+          </FormGroup>
+          <ButtonGroup>
+            <Button
+              icon={copyInputStatus === 'success' ? 'tick' : 'duplicate'}
+              intent={copyInputStatus === 'success' ? Intent.SUCCESS : Intent.NONE}
+              onClick={() => copyToClipboard(leftText, 'input')}
+              disabled={!leftText}
+            >
+              {copyInputStatus === 'success' ? 'Copied' : 'Copy text'}
+            </Button>
+            <Button icon="eraser" onClick={() => { setLeftText(''); setRightText(''); setError(null); }} disabled={!leftText && !rightText}>
+              Clear
+            </Button>
+          </ButtonGroup>
+        </Card>
 
-      <Card elevation={1} style={{ marginBottom: 16 }}>
-        <FormGroup label={mode === 'encode' ? 'Input text' : 'Input Base64'} labelFor="b64-input">
-          <TextArea
-            id="b64-input"
-            placeholder={mode === 'encode' ? 'Type or paste text to encode…' : 'Type or paste Base64 to decode…'}
-            large
-            fill
-            value={input}
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
-            style={{ height: 140, resize: 'none' }}
-          />
-        </FormGroup>
-        <ButtonGroup>
-          <Button
-            icon={copyInputStatus === 'success' ? 'tick' : 'duplicate'}
-            intent={copyInputStatus === 'success' ? Intent.SUCCESS : Intent.NONE}
-            onClick={() => copyToClipboard(input, 'input')}
-            disabled={!input}
+        <Card elevation={1}>
+          <FormGroup
+            label="Base64"
+            labelFor="b64-output"
+            helperText={error ?? undefined}
+            intent={error ? Intent.DANGER : Intent.NONE}
           >
-            {copyInputStatus === 'success' ? 'Copied' : 'Copy input'}
-          </Button>
-          <Button icon="eraser" onClick={() => setInput('')} disabled={!input}>
-            Clear
-          </Button>
-        </ButtonGroup>
-      </Card>
-
-      <Card elevation={1}>
-        <FormGroup
-          label={mode === 'encode' ? 'Output Base64' : 'Output text'}
-          labelFor="b64-output"
-          helperText={error ?? undefined}
-          intent={error ? Intent.DANGER : Intent.NONE}
-        >
-          <TextArea id="b64-output" value={output} readOnly fill large style={{ height: 140, resize: 'none', pointerEvents: 'none' }} />
-        </FormGroup>
-        <ButtonGroup>
-          <Button
-            icon={copyOutputStatus === 'success' ? 'tick' : 'clipboard'}
-            intent={copyOutputStatus === 'success' ? Intent.SUCCESS : Intent.PRIMARY}
-            onClick={() => copyToClipboard(output, 'output')}
-            disabled={!output || !!error}
-          >
-            {copyOutputStatus === 'success' ? 'Copied' : 'Copy output'}
-          </Button>
-        </ButtonGroup>
-      </Card>
+            <TextArea
+              id="b64-output"
+              placeholder="Type or paste Base64…"
+              large
+              fill
+              value={rightText}
+              onChange={handleRightChange}
+              style={{ height: 160, resize: 'none' }}
+            />
+          </FormGroup>
+          <ButtonGroup>
+            <Button
+              icon={copyOutputStatus === 'success' ? 'tick' : 'clipboard'}
+              intent={copyOutputStatus === 'success' ? Intent.SUCCESS : Intent.PRIMARY}
+              onClick={() => copyToClipboard(rightText, 'output')}
+              disabled={!rightText || !!error}
+            >
+              {copyOutputStatus === 'success' ? 'Copied' : 'Copy Base64'}
+            </Button>
+          </ButtonGroup>
+        </Card>
+      </div>
     </ToolTemplate>
   );
 };

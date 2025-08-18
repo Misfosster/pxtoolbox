@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview:ci": "vite preview --strictPort --port 4173",
+    "preview:ci": "tsc -b && vite build && vite preview --strictPort --port 4173",
     "test:e2e": "playwright test",
     "lint": "eslint .",
     "preview": "vite preview",
