@@ -1,37 +1,77 @@
-import React from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
-  Navbar, 
-  NavbarGroup, 
-  NavbarHeading, 
-  Alignment
+  Card,
+  H3,
+  Menu,
+  MenuItem,
+  Collapse
 } from '@blueprintjs/core';
-import NavTabs from './NavTabs';
-import type { NavTabItem } from './NavTabs';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 interface LayoutProps {
   children: React.ReactNode;
 }
 
 const Layout: React.FC<LayoutProps> = ({ children }) => {
-  // Add tabs to the navbar
-  const tabs: NavTabItem[] = [
-    { label: 'Home', to: '/', icon: 'home' },
-    { label: 'Tools', to: '/tools', icon: 'layout-grid' },
-  ];
+  const navigate = useNavigate();
+  const { pathname } = useLocation();
+  const isToolsRoute = useMemo(() => pathname.startsWith('/tools'), [pathname]);
+  const [toolsOpen, setToolsOpen] = useState<boolean>(isToolsRoute);
+
+  useEffect(() => {
+    if (isToolsRoute) setToolsOpen(true);
+  }, [isToolsRoute]);
+
   return (
-    <div>
-      <Navbar>
-        <NavbarGroup align={Alignment.END}>
-          <NavbarHeading>
-          🔧 PX Toolbox 
-          </NavbarHeading>
-        </NavbarGroup>
-        <NavTabs tabs={tabs} align="left" gapPx={12} />
-      </Navbar>
-      
-      <div className="main-container">
-        {children}
-      </div>
+    <div className="app-layout">
+      <aside className="sidebar">
+        <Card elevation={2} className="sidebar-header">
+          <H3 style={{ margin: 0 }}>🔧 PX Toolbox</H3>
+        </Card>
+        <Menu className="sidebar-menu">
+          <MenuItem
+            icon="home"
+            text="Home"
+            active={pathname === '/'}
+            onClick={() => navigate('/')}
+          />
+          <MenuItem
+            className="menu-tools-toggle"
+            icon="wrench"
+            text="Tools"
+            aria-expanded={toolsOpen}
+            onClick={() => setToolsOpen((v) => !v)}
+          />
+          <Collapse isOpen={toolsOpen} keepChildrenMounted>
+            <Menu className="sidebar-submenu">
+              <MenuItem
+                icon="exchange"
+                text="Base64 Encoder/Decoder"
+                active={pathname === '/tools/base64'}
+                onClick={() => navigate('/tools/base64')}
+              />
+              <MenuItem
+                icon="key"
+                text="JWT Decoder"
+                active={pathname === '/tools/jwt'}
+                onClick={() => navigate('/tools/jwt')}
+              />
+              <MenuItem
+                icon="list"
+                text="All tools…"
+                active={pathname === '/tools'}
+                onClick={() => navigate('/tools')}
+              />
+            </Menu>
+          </Collapse>
+        </Menu>
+      </aside>
+
+      <main className="content-container">
+        <div className="main-container">
+          {children}
+        </div>
+      </main>
     </div>
   );
 };

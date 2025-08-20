@@ -17,6 +17,90 @@ html, body {
   min-height: 100vh;
 }
 
+/* Layout: vertical sidebar on the left */
+.app-layout {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  min-height: 100vh;
+}
+
+.sidebar {
+  border-right: 1px solid rgba(16, 22, 26, 0.4);
+  background-color: #1f2a33;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-header {
+  border-radius: 0;
+}
+
+.sidebar-menu {
+  box-shadow: none;
+  background: transparent;
+  border-radius: 0;
+  padding: 8px 6px;
+}
+
+.sidebar-submenu {
+  background: transparent;
+  box-shadow: none;
+  margin-left: 14px;
+  border-left: 2px solid rgba(138, 155, 168, 0.2);
+  padding-left: 8px;
+}
+
+.content-container {
+  overflow: auto;
+}
+
+/* Improve menu item spacing and colors */
+.bp5-menu .bp5-menu-item {
+  border-radius: 6px;
+}
+
+.bp5-menu .bp5-menu-item:not(.bp5-active):hover {
+  background: rgba(138, 155, 168, 0.14);
+}
+
+/* Ensure menu labels align naturally; no extra caret label */
+.menu-tools-toggle .bp5-menu-item-label { margin-left: 0; }
+
+/* Remove light blue focus outline on mouse clicks, preserve for keyboard */
+.bp5-button:focus:not(:focus-visible),
+.bp5-menu-item:focus:not(:focus-visible),
+.bp5-input:focus:not(:focus-visible),
+textarea.bp5-input:focus:not(:focus-visible) {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Remove outline entirely for sidebar menu items (mouse or keyboard) */
+.sidebar .bp5-menu-item,
+.sidebar .bp5-menu-item:focus,
+.sidebar .bp5-menu-item:focus-visible,
+.sidebar .bp5-menu-item:active,
+.sidebar .bp5-menu-item.bp5-active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Tools toggle: never show the blue focus ring or active ring */
+.menu-tools-toggle,
+.menu-tools-toggle:focus,
+.menu-tools-toggle:focus-visible,
+.menu-tools-toggle:active,
+.menu-tools-toggle.bp5-active,
+.menu-tools-toggle.bp5-intent-primary {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Keep Tools toggle neutral (never active blue) */
+.menu-tools-toggle.bp5-active {
+  background: transparent;
+}
+
 .main-container {
   padding: 20px;
   max-width: 1200px;
@@ -65,6 +149,132 @@ html, body {
   gap: 15px;
 }
 
+/* Force resizable cards to use CSS Grid for precise control */
+.resizable-card {
+  display: grid !important;
+  grid-template-rows: minmax(0, 1fr) auto !important; /* grow content then buttons */
+  gap: 8px !important;
+  overflow: hidden; /* hide native corner */
+  resize: none !important; /* disable native */
+  position: relative;
+  padding-bottom: 8px !important; /* tighter bottom padding */
+}
+
+/* Variant for cards that include a header at the top (e.g., JWT Decoded) */
+.resizable-card--with-header {
+  grid-template-rows: auto minmax(0, 1fr) !important; /* header then growing content */
+}
+
+.resizable-card h3 {
+  margin: 0 !important;
+}
+
+/* Label + growing content */
+.resizable-card .bp5-form-group,
+.resizable-card .bp6-form-group {
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) !important;
+  gap: 4px !important;
+  margin-bottom: 0 !important;
+}
+
+/* Center labels above textareas and bump font size slightly */
+.resizable-card .bp5-label,
+.resizable-card .bp6-label {
+  justify-self: center;
+  text-align: center;
+  font-size: 0.95rem;
+}
+
+/* Slightly larger textarea text */
+.resizable-card textarea.bp5-input,
+.resizable-card textarea.bp6-input,
+.resizable-card .bp6-text-area,
+.resizable-card .bp5-textarea {
+  font-size: 0.95rem;
+  line-height: 1.35;
+}
+
+/* Flatten Blueprint wrapper so the textarea itself can stretch as the grid row item */
+.resizable-card .bp5-form-content,
+.resizable-card .bp6-form-content {
+  display: contents !important;
+}
+
+/* Make the textarea fill the grid track */
+.resizable-card .bp5-form-content > textarea.bp5-input,
+.resizable-card .bp5-form-content > .bp5-input,
+.resizable-card .bp5-form-content > .bp5-textarea,
+.resizable-card .bp6-form-content > textarea.bp6-input,
+.resizable-card .bp6-form-content > .bp6-input,
+.resizable-card .bp6-form-content > .bp6-text-area {
+  height: 100% !important;
+  min-height: 0 !important;
+}
+
+.resizable-area-wrap {
+  display: grid !important;
+  grid-template-rows: 1fr !important;
+  min-height: 0 !important;
+  position: relative !important;
+}
+
+/* Auto-size decoded JWT fields to content while preserving overlay buttons */
+#jwt-header,
+#jwt-payload,
+#jwt-signature {
+  height: auto !important;
+  min-height: 40px;
+}
+
+/* Custom vertical handle */
+.v-resize-handle {
+  height: 10px;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 4px;
+}
+.v-resize-handle .line {
+  width: 40px;
+  height: 2px;
+  border-radius: 2px;
+  background: rgba(138, 155, 168, 0.45);
+}
+.v-resize-handle:hover .line {
+  background: rgba(138, 155, 168, 0.75);
+}
+
+/* Extra safety: hide any native resizer corners inside cards */
+.resizable-card::-webkit-resizer,
+.resizable-card textarea::-webkit-resizer,
+.resizable-card .bp6-text-area::-webkit-resizer,
+.resizable-card .bp5-textarea::-webkit-resizer {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Keep buttons at natural size */
+.resizable-card .bp5-button-group,
+.resizable-card .bp6-button-group {
+  justify-self: center !important;
+  align-self: center !important;
+}
+
+/* Tight bottom area: buttons + handle sit in one row with tiny spacing */
+.card-bottom {
+  display: grid;
+  grid-template-rows: auto auto; /* buttons row(s) then handle */
+  row-gap: 4px;
+  align-items: center;
+  justify-items: center; /* center contents in each column */
+}
+.card-bottom .v-resize-handle {
+  justify-self: center; /* center the handle under both columns */
+}
+
 .tool-section {
   margin-bottom: 20px;
 }
@@ -78,6 +288,14 @@ html, body {
 }
 
 @media (max-width: 768px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
   .main-container {
     padding: 10px;
   }

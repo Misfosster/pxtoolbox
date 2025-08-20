@@ -62,6 +62,30 @@ const Base64Tool: React.FC = () => {
     }
   }
 
+  function startVerticalResize(e: React.MouseEvent<HTMLDivElement>) {
+    const handleEl = e.currentTarget as HTMLElement;
+    const card = handleEl.closest('.resizable-card') as HTMLElement | null;
+    if (!card) return;
+    const startY = e.clientY;
+    const startHeight = card.getBoundingClientRect().height;
+    const minHeight = 180;
+    const onMove = (ev: MouseEvent) => {
+      const delta = ev.clientY - startY;
+      const next = Math.max(minHeight, startHeight + delta);
+      card.style.height = `${next}px`;
+    };
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+  }
+
   function handleLeftChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     const newLeft = e.target.value;
     setLeftText(newLeft);
@@ -100,9 +124,9 @@ const Base64Tool: React.FC = () => {
 
   return (
     <ToolTemplate title="Base64 Encoder/Decoder" description="Convert text to and from Base64 (supports Base64URL, missing padding, and whitespace). All processing happens locally in your browser.">
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'start' }}>
-        <Card elevation={1}>
-          <FormGroup label="Text" labelFor="b64-input">
+      <Card elevation={1} className="resizable-card" style={{ resize: 'vertical', overflow: 'auto', minHeight: 220 }}>
+        <div className="dual-pane" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 8, minHeight: 0 }}>
+          <FormGroup className="resizable-group" label="Text" labelFor="b64-input" style={{ height: '100%' }}>
             <TextArea
               id="b64-input"
               placeholder="Type or paste text…"
@@ -110,9 +134,29 @@ const Base64Tool: React.FC = () => {
               fill
               value={leftText}
               onChange={handleLeftChange}
-              style={{ height: 160, resize: 'none' }}
+              style={{ height: '100%', resize: 'none' }}
             />
           </FormGroup>
+          <FormGroup
+            className="resizable-group"
+            label="Base64"
+            labelFor="b64-output"
+            helperText={error ?? undefined}
+            intent={error ? Intent.DANGER : Intent.NONE}
+            style={{ height: '100%' }}
+          >
+            <TextArea
+              id="b64-output"
+              placeholder="Type or paste Base64…"
+              large
+              fill
+              value={rightText}
+              onChange={handleRightChange}
+              style={{ height: '100%', resize: 'none' }}
+            />
+          </FormGroup>
+        </div>
+        <div className="card-bottom" style={{ gridTemplateColumns: '1fr 1fr', justifyItems: 'start' }}>
           <ButtonGroup>
             <Button
               icon={copyInputStatus === 'success' ? 'tick' : 'duplicate'}
@@ -126,26 +170,7 @@ const Base64Tool: React.FC = () => {
               Clear
             </Button>
           </ButtonGroup>
-        </Card>
-
-        <Card elevation={1}>
-          <FormGroup
-            label="Base64"
-            labelFor="b64-output"
-            helperText={error ?? undefined}
-            intent={error ? Intent.DANGER : Intent.NONE}
-          >
-            <TextArea
-              id="b64-output"
-              placeholder="Type or paste Base64…"
-              large
-              fill
-              value={rightText}
-              onChange={handleRightChange}
-              style={{ height: 160, resize: 'none' }}
-            />
-          </FormGroup>
-          <ButtonGroup>
+          <ButtonGroup style={{ justifySelf: 'end' }}>
             <Button
               icon={copyOutputStatus === 'success' ? 'tick' : 'clipboard'}
               intent={copyOutputStatus === 'success' ? Intent.SUCCESS : Intent.PRIMARY}
@@ -155,8 +180,11 @@ const Base64Tool: React.FC = () => {
               {copyOutputStatus === 'success' ? 'Copied' : 'Copy Base64'}
             </Button>
           </ButtonGroup>
-        </Card>
-      </div>
+          <div className="v-resize-handle" onMouseDown={startVerticalResize} style={{ gridColumn: '1 / -1' }}>
+            <div className="line" />
+          </div>
+        </div>
+      </Card>
     </ToolTemplate>
   );
 };
