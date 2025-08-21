@@ -212,12 +212,7 @@ textarea.bp5-input:focus:not(:focus-visible) {
   min-height: 0 !important;
 }
 
-.resizable-area-wrap {
-  display: grid !important;
-  grid-template-rows: 1fr !important;
-  min-height: 0 !important;
-  position: relative !important;
-}
+/* removed usage for JWT decoded sections to avoid height constraints */
 
 /* Auto-size decoded JWT fields to content while preserving overlay buttons */
 #jwt-header,
@@ -225,6 +220,11 @@ textarea.bp5-input:focus:not(:focus-visible) {
 #jwt-signature {
   height: auto !important;
   min-height: 40px;
+}
+
+/* Prevent clipping for custom payload viewer rows */
+.jwt-payload-viewer-row {
+  align-items: flex-start;
 }
 
 /* Custom vertical handle */

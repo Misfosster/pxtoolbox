@@ -69,16 +69,41 @@ const Base64Tool: React.FC = () => {
     const startY = e.clientY;
     const startHeight = card.getBoundingClientRect().height;
     const minHeight = 180;
+    let rafId: number | null = null;
+    function autoScrollIfNearEdges(ev: MouseEvent) {
+      const viewportPadding = 24; // px from edges to trigger scroll
+      const speed = 12; // px per frame while near edge
+      const { clientY } = ev;
+      const h = window.innerHeight;
+      let dy = 0;
+      if (clientY < viewportPadding) dy = -speed;
+      else if (clientY > h - viewportPadding) dy = speed;
+      if (dy !== 0) {
+        if (rafId == null) {
+          const step = () => {
+            window.scrollBy(0, dy);
+            rafId = requestAnimationFrame(step);
+          };
+          rafId = requestAnimationFrame(step);
+        }
+      } else if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientY - startY;
       const next = Math.max(minHeight, startHeight + delta);
       card.style.height = `${next}px`;
+      autoScrollIfNearEdges(ev);
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      if (rafId != null) cancelAnimationFrame(rafId);
+      rafId = null;
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);

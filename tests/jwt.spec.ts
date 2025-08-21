@@ -19,6 +19,28 @@ test.describe('JWT Decoder Tool', () => {
     await page.getByTestId('copy-payload-btn').click();
   });
 
+  test('shows exp/nbf/iat helper text with UTC and relative time', async ({ page }) => {
+    await page.goto('/#/tools/jwt');
+
+    const nowSec = Math.floor(Date.now() / 1000);
+    const payloadObj = {
+      sub: 'abc',
+      nbf: nowSec - 60, // became valid 1 minute ago
+      iat: nowSec - 120, // issued 2 minutes ago
+      exp: nowSec + 3600, // expires in 1 hour
+    };
+    const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
+    const payload = Buffer.from(JSON.stringify(payloadObj)).toString('base64url');
+    const token = `${header}.${payload}.`;
+
+    await page.locator('#jwt-input').fill(token);
+
+    // Helper text should include labels and UTC suffix
+    await expect(page.getByText(/nbf: .* UTC/)).toBeVisible();
+    await expect(page.getByText(/iat: .* UTC/)).toBeVisible();
+    await expect(page.getByText(/exp: .* UTC/)).toBeVisible();
+  });
+
   test('shows error for malformed JWT', async ({ page }) => {
     await page.goto('/#/tools/jwt');
 

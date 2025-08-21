@@ -1,5 +1,5 @@
-import React, { useMemo, useState } from 'react';
-import { Card, FormGroup, H3, Intent, TextArea, Button, ButtonGroup } from '@blueprintjs/core';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
+import { Card, FormGroup, H3, Intent, TextArea, Button, ButtonGroup, Classes } from '@blueprintjs/core';
 import ToolTemplate from '../components/ToolTemplate';
 
 function normalizeBase64Url(input: string): string {
@@ -31,16 +31,7 @@ function tryParseJson(text: string): { pretty: string | null; error: string | nu
   }
 }
 
-function extractPayloadClaims(text: string): { exp?: number; nbf?: number } | null {
-  try {
-    const obj = JSON.parse(text);
-    const exp = typeof obj.exp === 'number' ? obj.exp : undefined;
-    const nbf = typeof obj.nbf === 'number' ? obj.nbf : undefined;
-    return { exp, nbf };
-  } catch {
-    return null;
-  }
-}
+// Note: payload claim extraction is now done inline when rendering per-line hints
 
 function formatRelative(targetMs: number, nowMs: number): string {
   const delta = targetMs - nowMs;
@@ -70,13 +61,17 @@ const JWTDecoderTool: React.FC = () => {
   const [copyHeaderStatus, setCopyHeaderStatus] = useState<'idle' | 'success'>('idle');
   const [copyPayloadStatus, setCopyPayloadStatus] = useState<'idle' | 'success'>('idle');
   const [copySignatureStatus, setCopySignatureStatus] = useState<'idle' | 'success'>('idle');
+
+  const headerRef = useRef<HTMLTextAreaElement | null>(null);
+  const payloadRef = useRef<HTMLTextAreaElement | null>(null);
+  const signatureRef = useRef<HTMLTextAreaElement | null>(null);
   
 
-  const { headerPretty, payloadPretty, signatureText, error, payloadClaims } = useMemo(() => {
-    if (!token) return { headerPretty: '', payloadPretty: '', signatureText: '', error: null as string | null, payloadClaims: null as null | { exp?: number; nbf?: number } };
+  const { headerPretty, payloadPretty, signatureText, error } = useMemo(() => {
+    if (!token) return { headerPretty: '', payloadPretty: '', signatureText: '', error: null as string | null };
     const parts = token.split('.');
     if (parts.length !== 2 && parts.length !== 3) {
-      return { headerPretty: '', payloadPretty: '', signatureText: '', error: 'JWT must have 2 or 3 segments', payloadClaims: null };
+      return { headerPretty: '', payloadPretty: '', signatureText: '', error: 'JWT must have 2 or 3 segments' };
     }
     try {
       const headerText = decodeSegment(parts[0]);
@@ -90,12 +85,31 @@ const JWTDecoderTool: React.FC = () => {
         payloadPretty: payload.pretty ?? payloadText,
         signatureText: signature,
         error: firstError,
-        payloadClaims: extractPayloadClaims(payloadText),
       };
     } catch (e) {
-      return { headerPretty: '', payloadPretty: '', signatureText: '', error: 'Invalid Base64URL in token', payloadClaims: null };
+      return { headerPretty: '', payloadPretty: '', signatureText: '', error: 'Invalid Base64URL in token' };
     }
   }, [token]);
+
+  // Autosize helper for textareas with a sensible minimum height
+  function autosize(el: HTMLTextAreaElement | null, minPx: number) {
+    if (!el) return;
+    el.style.height = 'auto';
+    const next = Math.max(minPx, el.scrollHeight);
+    el.style.height = `${next}px`;
+  }
+
+  useEffect(() => {
+    autosize(headerRef.current, 100);
+  }, [headerPretty]);
+  useEffect(() => {
+    autosize(payloadRef.current, 140);
+  }, [payloadPretty]);
+  useEffect(() => {
+    autosize(signatureRef.current, 60);
+  }, [signatureText]);
+
+  // payload line hints are rendered inline per line below
 
   async function copyToClipboard(text: string, target: 'header' | 'payload' | 'signature') {
     const setStatus =
@@ -120,16 +134,41 @@ const JWTDecoderTool: React.FC = () => {
     const startY = e.clientY;
     const startHeight = area.getBoundingClientRect().height;
     const minHeight = 60;
+    let rafId: number | null = null;
+    function autoScrollIfNearEdges(ev: MouseEvent) {
+      const viewportPadding = 24; // px from edges to trigger scroll
+      const speed = 12; // px per frame while near edge
+      const { clientY } = ev;
+      const h = window.innerHeight;
+      let dy = 0;
+      if (clientY < viewportPadding) dy = -speed;
+      else if (clientY > h - viewportPadding) dy = speed;
+      if (dy !== 0) {
+        if (rafId == null) {
+          const step = () => {
+            window.scrollBy(0, dy);
+            rafId = requestAnimationFrame(step);
+          };
+          rafId = requestAnimationFrame(step);
+        }
+      } else if (rafId != null) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
+    }
     const onMove = (ev: MouseEvent) => {
       const delta = ev.clientY - startY;
       const next = Math.max(minHeight, startHeight + delta);
       area.style.height = `${next}px`;
+      autoScrollIfNearEdges(ev);
     };
     const onUp = () => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
       document.body.style.cursor = '';
       document.body.style.userSelect = '';
+      if (rafId != null) cancelAnimationFrame(rafId);
+      rafId = null;
     };
     window.addEventListener('mousemove', onMove);
     window.addEventListener('mouseup', onUp);
@@ -171,7 +210,7 @@ const JWTDecoderTool: React.FC = () => {
         </div>
       </Card>
 
-      <Card elevation={1} className="resizable-card resizable-card--with-header" style={{ resize: 'vertical', overflow: 'auto', minHeight: 260 }}>
+      <Card elevation={1}>
         <H3 style={{ marginTop: 0 }}>Decoded</H3>
         <FormGroup
           className="resizable-group"
@@ -180,8 +219,8 @@ const JWTDecoderTool: React.FC = () => {
           helperText={error ?? undefined}
           intent={error ? Intent.DANGER : Intent.NONE}
         >
-          <div className="resizable-area-wrap" style={{ position: 'relative' }}>
-            <TextArea id="jwt-header" value={headerPretty} readOnly fill large style={{ height: 120, paddingRight: 88, resize: 'none' }} />
+          <div style={{ position: 'relative' }}>
+            <TextArea inputRef={headerRef} id="jwt-header" value={headerPretty} readOnly fill large style={{ height: 'auto', minHeight: 100, paddingRight: 88, resize: 'none', overflow: 'visible' }} />
             <div className="overlay-actions" style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
               <Button
                 icon={copyHeaderStatus === 'success' ? 'tick' : 'clipboard'}
@@ -201,23 +240,44 @@ const JWTDecoderTool: React.FC = () => {
           className="resizable-group"
           label="Payload"
           labelFor="jwt-payload"
-          helperText={(() => {
-            if (!payloadClaims) return undefined;
-            const now = Date.now();
-            const parts: string[] = [];
-            if (payloadClaims.nbf !== undefined) {
-              const ms = payloadClaims.nbf * 1000;
-              parts.push(`nbf: ${formatUtc(payloadClaims.nbf)} (${formatRelative(ms, now)})`);
-            }
-            if (payloadClaims.exp !== undefined) {
-              const ms = payloadClaims.exp * 1000;
-              parts.push(`exp: ${formatUtc(payloadClaims.exp)} (${formatRelative(ms, now)})`);
-            }
-            return parts.length ? parts.join('  •  ') : undefined;
-          })()}
         >
-          <div className="resizable-area-wrap" style={{ position: 'relative' }}>
-            <TextArea id="jwt-payload" value={payloadPretty} readOnly fill large style={{ height: 160, paddingRight: 88, resize: 'none' }} />
+          <div style={{ position: 'relative' }}>
+            {/* Visible viewer with per-line grey comments */}
+            <div style={{
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+              whiteSpace: 'pre',
+              overflowX: 'auto',
+              overflowY: 'hidden',
+              paddingRight: 88,
+              borderRadius: 3,
+              border: '1px solid rgba(138,155,168,0.15)',
+              background: 'rgba(16,22,26,0.3)',
+              padding: 8,
+              minHeight: 140,
+            }}>
+              {payloadPretty.split('\n').map((line, idx) => {
+                const match = line.match(/"(nbf|iat|exp)"\s*:\s*(\d+)/);
+                let hint: string | null = null;
+                if (match) {
+                  const key = match[1] as 'nbf' | 'iat' | 'exp';
+                  const seconds = Number(match[2]);
+                  const now = Date.now();
+                  const ms = seconds * 1000;
+                  const label = key;
+                  hint = `${label}: ${formatUtc(seconds)} (${formatRelative(ms, now)})`;
+                }
+                return (
+                  <div key={idx} className="jwt-payload-viewer-row" style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                    <span style={{ flex: '1 1 auto' }}>{line}</span>
+                    {hint && (
+                      <span className={Classes.TEXT_MUTED} style={{ flex: '0 0 auto', whiteSpace: 'pre' }}> // {hint}</span>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            {/* Hidden textarea kept for selection APIs and tests */}
+            <TextArea inputRef={payloadRef} id="jwt-payload" value={payloadPretty} readOnly fill large style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', height: 0, width: 0, resize: 'none' }} />
             <div className="overlay-actions" style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
               <Button
                 icon={copyPayloadStatus === 'success' ? 'tick' : 'clipboard'}
@@ -234,8 +294,8 @@ const JWTDecoderTool: React.FC = () => {
           
         </FormGroup>
         <FormGroup className="resizable-group" label="Signature (raw)" labelFor="jwt-signature">
-          <div className="resizable-area-wrap" style={{ position: 'relative' }}>
-            <TextArea id="jwt-signature" value={signatureText} readOnly fill large style={{ height: 60, paddingRight: 88, resize: 'none' }} />
+          <div style={{ position: 'relative' }}>
+            <TextArea inputRef={signatureRef} id="jwt-signature" value={signatureText} readOnly fill large style={{ height: 'auto', minHeight: 60, paddingRight: 88, resize: 'none', overflow: 'visible' }} />
             <div className="overlay-actions" style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
               <Button
                 icon={copySignatureStatus === 'success' ? 'tick' : 'clipboard'}
