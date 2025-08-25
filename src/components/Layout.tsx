@@ -7,6 +7,7 @@ import {
   Collapse
 } from '@blueprintjs/core';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { getVisibleTools } from '../tools/registry';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -44,18 +45,15 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           />
           <Collapse isOpen={toolsOpen} keepChildrenMounted>
             <Menu className="sidebar-submenu">
-              <MenuItem
-                icon="exchange"
-                text="Base64 Encoder/Decoder"
-                active={pathname === '/tools/base64'}
-                onClick={() => navigate('/tools/base64')}
-              />
-              <MenuItem
-                icon="key"
-                text="JWT Decoder"
-                active={pathname === '/tools/jwt'}
-                onClick={() => navigate('/tools/jwt')}
-              />
+              {getVisibleTools().map((tool) => (
+                <MenuItem
+                  key={tool.id}
+                  icon={tool.icon}
+                  text={tool.label}
+                  active={pathname === `/tools/${tool.path}`}
+                  onClick={() => navigate(`/tools/${tool.path}`)}
+                />
+              ))}
               <MenuItem
                 icon="list"
                 text="All tools…"
