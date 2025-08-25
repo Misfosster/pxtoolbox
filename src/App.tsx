@@ -5,8 +5,7 @@ import './App.css';
 import Layout from './components/Layout';
 import Home from './components/Home';
 import ToolsHub from './components/ToolsHub';
-import Base64Tool from './tools/Base64Tool';
-import JWTDecoderTool from './tools/JWTDecoderTool';
+import { toolsRegistry } from './tools/registry';
 
 function App() {
   return (
@@ -16,8 +15,9 @@ function App() {
           <Routes>
             <Route path="/" element={<Home />} />
             <Route path="/tools" element={<ToolsHub />} />
-            <Route path="/tools/base64" element={<Base64Tool />} />
-            <Route path="/tools/jwt" element={<JWTDecoderTool />} />
+            {toolsRegistry.map((tool) => (
+              <Route key={tool.id} path={`/tools/${tool.path}`} element={<tool.component />} />
+            ))}
           </Routes>
         </Layout>
       </Router>
