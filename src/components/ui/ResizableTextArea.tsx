@@ -7,13 +7,17 @@ export interface ResizableTextAreaProps extends TextAreaProps {
 	maxRows?: number;
 }
 
-const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, style, fill = true, large = true, inputRef, onChange, value, defaultValue, autosize = true, maxRows, ...rest }) => {
+const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, style, fill = true, size = 'large', inputRef, onChange, value, defaultValue, autosize = true, maxRows, ...rest }) => {
 	const elRef = useRef<HTMLTextAreaElement | null>(null);
+
+	function isRefObject(r: React.Ref<HTMLTextAreaElement> | undefined): r is React.MutableRefObject<HTMLTextAreaElement | null> {
+		return typeof r === 'object' && r !== null && 'current' in r;
+	}
 
 	function setRef(el: HTMLTextAreaElement | null) {
 		elRef.current = el;
 		if (typeof inputRef === 'function') inputRef(el);
-		else if (inputRef && 'current' in (inputRef as any)) (inputRef as any).current = el;
+		else if (isRefObject(inputRef)) inputRef.current = el;
 	}
 
 	function fit() {
@@ -47,11 +51,11 @@ const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, styl
 	return (
 		<TextArea
 			{...rest}
-			value={value as any}
-			defaultValue={defaultValue as any}
+			value={value}
+			defaultValue={defaultValue}
 			rows={minRows}
 			fill={fill}
-			large={large}
+			size={size}
 			inputRef={setRef}
 			style={{ ...style, resize: 'none', marginBottom: 0, height: autosize ? undefined : '100%', overflow: autosize && maxRows ? 'auto' : autosize ? undefined : 'auto' }}
 			onChange={(e) => {

@@ -1,20 +1,8 @@
-export function normalizeBase64Url(input: string): string {
-	let s = input.replace(/-/g, '+').replace(/_/g, '/');
-	const pad = s.length % 4;
-	if (pad === 2) s += '==';
-	else if (pad === 3) s += '=';
-	else if (pad === 1) throw new Error('Invalid Base64 length');
-	return s;
-}
+import { decodeFromBase64 } from './base64';
 
 export function decodeSegment(segment: string): string {
 	if (!segment) return '';
-	const normalized = normalizeBase64Url(segment);
-	const binary = atob(normalized);
-	const bytes = new Uint8Array(binary.length);
-	for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-	const decoder = new TextDecoder('utf-8', { fatal: false });
-	return decoder.decode(bytes);
+	return decodeFromBase64(segment);
 }
 
 export function tryParseJson(text: string): { pretty: string | null; error: string | null } {

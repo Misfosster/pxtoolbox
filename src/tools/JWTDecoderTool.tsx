@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Card, FormGroup, H3, Intent, Button, ButtonGroup, Classes } from '@blueprintjs/core';
 import ToolTemplate from '../components/ToolTemplate';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
@@ -9,7 +9,23 @@ const JWTDecoderTool: React.FC = () => {
   const [copyHeaderStatus, setCopyHeaderStatus] = useState<'idle' | 'success'>('idle');
   const [copyPayloadStatus, setCopyPayloadStatus] = useState<'idle' | 'success'>('idle');
   const [copySignatureStatus, setCopySignatureStatus] = useState<'idle' | 'success'>('idle');
-  const [showPayloadHints, setShowPayloadHints] = useState<boolean>(true);
+  const HINTS_STORAGE_KEY = 'jwt.showPayloadHints';
+  const [showPayloadHints, setShowPayloadHints] = useState<boolean>(() => {
+    try {
+      const raw = localStorage.getItem(HINTS_STORAGE_KEY);
+      return raw == null ? true : raw === '1' || raw === 'true';
+    } catch {
+      return true;
+    }
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(HINTS_STORAGE_KEY, showPayloadHints ? '1' : '0');
+    } catch {
+      // ignore storage errors
+    }
+  }, [showPayloadHints]);
 
   const { headerPretty, payloadPretty, signatureText, error } = useMemo(() => {
     if (!token) return { headerPretty: '', payloadPretty: '', signatureText: '', error: null as string | null };
