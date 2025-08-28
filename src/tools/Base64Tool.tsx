@@ -3,6 +3,7 @@ import { Button, ButtonGroup, Card, FormGroup, Intent } from '@blueprintjs/core'
 import ToolShell from '../components/ui/ToolShell';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
 import { encodeToBase64, decodeFromBase64 } from '../utils/base64';
+import CopyButton from '../components/ui/CopyButton';
 
 // encoding/decoding helpers moved to utils/base64
 
@@ -10,21 +11,7 @@ const Base64Tool: React.FC = () => {
   const [leftText, setLeftText] = useState<string>('');
   const [rightText, setRightText] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
-  const [copyInputStatus, setCopyInputStatus] = useState<'idle' | 'success'>('idle');
-  const [copyOutputStatus, setCopyOutputStatus] = useState<'idle' | 'success'>('idle');
-
-  async function copyToClipboard(text: string, target: 'input' | 'output') {
-    const setStatus = target === 'input' ? setCopyInputStatus : setCopyOutputStatus;
-    try {
-      await navigator.clipboard.writeText(text);
-      setStatus('success');
-    } catch {
-      // ignore errors; keep idle state
-    } finally {
-      // reset after brief feedback window
-      setTimeout(() => setStatus('idle'), 1500);
-    }
-  }
+  
 
   
 
@@ -103,27 +90,27 @@ const Base64Tool: React.FC = () => {
         </div>
         <div className="card-bottom" style={{ gridTemplateColumns: '1fr 1fr', justifyItems: 'start' }}>
           <ButtonGroup>
-            <Button
-              icon={copyInputStatus === 'success' ? 'tick' : 'duplicate'}
-              intent={copyInputStatus === 'success' ? Intent.SUCCESS : Intent.NONE}
-              onClick={() => copyToClipboard(leftText, 'input')}
+            <CopyButton
+              icon="duplicate"
+              successIcon="tick"
+              intent={Intent.NONE}
+              text={leftText}
               disabled={!leftText}
-            >
-              {copyInputStatus === 'success' ? 'Copied' : 'Copy text'}
-            </Button>
+              label="Copy text"
+            />
             <Button icon="eraser" onClick={() => { setLeftText(''); setRightText(''); setError(null); }} disabled={!leftText && !rightText}>
               Clear
             </Button>
           </ButtonGroup>
           <ButtonGroup style={{ justifySelf: 'end' }}>
-            <Button
-              icon={copyOutputStatus === 'success' ? 'tick' : 'clipboard'}
-              intent={copyOutputStatus === 'success' ? Intent.SUCCESS : Intent.PRIMARY}
-              onClick={() => copyToClipboard(rightText, 'output')}
+            <CopyButton
+              icon="clipboard"
+              successIcon="tick"
+              intent={Intent.PRIMARY}
+              text={rightText}
               disabled={!rightText || !!error}
-            >
-              {copyOutputStatus === 'success' ? 'Copied' : 'Copy Base64'}
-            </Button>
+              label="Copy Base64"
+            />
           </ButtonGroup>
         </div>
       </Card>

@@ -1,4 +1,4 @@
-import React, { useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import { TextArea, type TextAreaProps } from '@blueprintjs/core';
 
 export interface ResizableTextAreaProps extends TextAreaProps {
@@ -20,7 +20,7 @@ const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, styl
 		else if (isRefObject(inputRef)) inputRef.current = el;
 	}
 
-	function fit() {
+	const fit = useCallback(() => {
 		const el = elRef.current;
 		if (!el) return;
 		const cs = window.getComputedStyle(el);
@@ -32,7 +32,7 @@ const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, styl
 		el.style.height = 'auto';
 		const next = Math.min(maxPx, Math.max(minPx, el.scrollHeight));
 		el.style.height = `${next}px`;
-	}
+	}, [minRows, maxRows]);
 
 	useLayoutEffect(() => {
 		if (!autosize) return;
@@ -42,11 +42,11 @@ const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, styl
 		const ro = new ResizeObserver(() => fit());
 		ro.observe(el);
 		return () => ro.disconnect();
-	}, [autosize]);
+	}, [autosize, fit]);
 
 	useEffect(() => {
 		if (autosize) fit();
-	}, [value, defaultValue, autosize]);
+	}, [value, defaultValue, autosize, fit]);
 
 	return (
 		<TextArea

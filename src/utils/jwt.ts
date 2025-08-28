@@ -26,8 +26,8 @@ export function formatRelative(targetMs: number, nowMs: number): string {
 
 	// Derive years/months primarily from total months so that 12 months => 1 year
 	const totalMonths = Math.floor(absMs / MONTH);
-	let years = Math.floor(totalMonths / 12);
-	let months = totalMonths % 12;
+	const years = Math.floor(totalMonths / 12);
+	const months = totalMonths % 12;
 
 	let rem = absMs - (years * 12 + months) * MONTH;
 	const days = Math.floor(rem / DAY); rem -= days * DAY;

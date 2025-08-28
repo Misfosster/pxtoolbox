@@ -5,7 +5,7 @@ export interface ToolDefinition {
 	label: string;
 	icon?: string; // Blueprint icon name
 	path: string; // route path under /tools
-	component: ComponentType<any>;
+	component: ComponentType<object>;
 	showInMenu?: boolean; // defaults to true
 	order?: number; // optional ordering hint
 }

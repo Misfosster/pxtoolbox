@@ -1,31 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, FormGroup, H3, Intent, Button, ButtonGroup, Classes } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
 import { decodeSegment, tryParseJson, formatRelative, formatUtc } from '../utils/jwt';
+import CopyButton from '../components/ui/CopyButton';
+import OverlayActions from '../components/ui/OverlayActions';
+import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
 
 const JWTDecoderTool: React.FC = () => {
   const [token, setToken] = useState<string>('');
-  const [copyHeaderStatus, setCopyHeaderStatus] = useState<'idle' | 'success'>('idle');
-  const [copyPayloadStatus, setCopyPayloadStatus] = useState<'idle' | 'success'>('idle');
-  const [copySignatureStatus, setCopySignatureStatus] = useState<'idle' | 'success'>('idle');
+  
   const HINTS_STORAGE_KEY = 'jwt.showPayloadHints';
-  const [showPayloadHints, setShowPayloadHints] = useState<boolean>(() => {
-    try {
-      const raw = localStorage.getItem(HINTS_STORAGE_KEY);
-      return raw == null ? true : raw === '1' || raw === 'true';
-    } catch {
-      return true;
-    }
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(HINTS_STORAGE_KEY, showPayloadHints ? '1' : '0');
-    } catch {
-      // ignore storage errors
-    }
-  }, [showPayloadHints]);
+  const [showPayloadHints, setShowPayloadHints] = useLocalStorageBoolean(HINTS_STORAGE_KEY, true);
 
   const { headerPretty, payloadPretty, signatureText, error } = useMemo(() => {
     if (!token) return { headerPretty: '', payloadPretty: '', signatureText: '', error: null as string | null };
@@ -46,7 +32,7 @@ const JWTDecoderTool: React.FC = () => {
         signatureText: signature,
         error: firstError,
       };
-    } catch (e) {
+    } catch {
       return { headerPretty: '', payloadPretty: '', signatureText: '', error: 'Invalid Base64URL in token' };
     }
   }, [token]);
@@ -69,22 +55,7 @@ const JWTDecoderTool: React.FC = () => {
 
   // payload line hints are rendered inline per line below
 
-  async function copyToClipboard(text: string, target: 'header' | 'payload' | 'signature') {
-    const setStatus =
-      target === 'header'
-        ? setCopyHeaderStatus
-        : target === 'payload'
-        ? setCopyPayloadStatus
-        : setCopySignatureStatus;
-    try {
-      await navigator.clipboard.writeText(text);
-      setStatus('success');
-    } catch {
-      // ignore
-    } finally {
-      setTimeout(() => setStatus('idle'), 1500);
-    }
-  }
+  
 
   // removed vertical slider per request
 
@@ -125,18 +96,19 @@ const JWTDecoderTool: React.FC = () => {
         >
           <div style={{ position: 'relative' }}>
             <ResizableTextArea id="jwt-header" value={headerPretty} readOnly minRows={6} style={{ paddingRight: 88, marginBottom: 0 }} />
-            <div className="overlay-actions" style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
-              <Button
-                icon={copyHeaderStatus === 'success' ? 'tick' : 'clipboard'}
-                intent={copyHeaderStatus === 'success' ? Intent.SUCCESS : Intent.PRIMARY}
+            <OverlayActions>
+              <CopyButton
+                icon="clipboard"
+                successIcon="tick"
+                intent={Intent.PRIMARY}
                 minimal
                 small
-                aria-label="Copy header"
-                data-testid="copy-header-btn"
-                onClick={() => copyToClipboard(headerPretty, 'header')}
+                ariaLabel="Copy header"
+                testId="copy-header-btn"
+                text={headerPretty}
                 disabled={!headerPretty}
               />
-            </div>
+            </OverlayActions>
           </div>
           
         </FormGroup>
@@ -182,7 +154,7 @@ const JWTDecoderTool: React.FC = () => {
             </div>
             {/* Hidden textarea kept for selection APIs and tests */}
             <textarea id="jwt-payload" value={payloadPretty} readOnly style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', height: 0, width: 0, resize: 'none' }} />
-            <div className="overlay-actions" style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
+            <OverlayActions>
               <Button
                 icon={showPayloadHints ? 'eye-open' : 'eye-off'}
                 minimal
@@ -190,35 +162,37 @@ const JWTDecoderTool: React.FC = () => {
                 aria-label={showPayloadHints ? 'Hide hints' : 'Show hints'}
                 onClick={() => setShowPayloadHints((v) => !v)}
               />
-              <Button
-                icon={copyPayloadStatus === 'success' ? 'tick' : 'clipboard'}
-                intent={copyPayloadStatus === 'success' ? Intent.SUCCESS : Intent.PRIMARY}
+              <CopyButton
+                icon="clipboard"
+                successIcon="tick"
+                intent={Intent.PRIMARY}
                 minimal
                 small
-                aria-label="Copy payload"
-                data-testid="copy-payload-btn"
-                onClick={() => copyToClipboard(payloadCopyText, 'payload')}
+                ariaLabel="Copy payload"
+                testId="copy-payload-btn"
+                text={payloadCopyText}
                 disabled={!payloadPretty}
               />
-            </div>
+            </OverlayActions>
           </div>
           
         </FormGroup>
         <FormGroup className="resizable-group" label="Signature (raw)" labelFor="jwt-signature">
           <div style={{ position: 'relative' }}>
             <ResizableTextArea id="jwt-signature" value={signatureText} readOnly minRows={3} style={{ paddingRight: 88, marginBottom: 0 }} />
-            <div className="overlay-actions" style={{ position: 'absolute', right: 8, bottom: 8, display: 'flex', gap: 6 }}>
-              <Button
-                icon={copySignatureStatus === 'success' ? 'tick' : 'clipboard'}
-                intent={copySignatureStatus === 'success' ? Intent.SUCCESS : Intent.PRIMARY}
+            <OverlayActions>
+              <CopyButton
+                icon="clipboard"
+                successIcon="tick"
+                intent={Intent.PRIMARY}
                 minimal
                 small
-                aria-label="Copy signature"
-                data-testid="copy-signature-btn"
-                onClick={() => copyToClipboard(signatureText, 'signature')}
+                ariaLabel="Copy signature"
+                testId="copy-signature-btn"
+                text={signatureText}
                 disabled={!signatureText}
               />
-            </div>
+            </OverlayActions>
           </div>
           
         </FormGroup>
