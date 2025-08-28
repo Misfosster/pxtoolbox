@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button, ButtonGroup, Card, FormGroup, Intent } from '@blueprintjs/core';
-import ToolTemplate from '../components/ToolTemplate';
+import ToolShell from '../components/ui/ToolShell';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
 import { encodeToBase64, decodeFromBase64 } from '../utils/base64';
 
@@ -69,7 +69,7 @@ const Base64Tool: React.FC = () => {
   }
 
   return (
-    <ToolTemplate title="Base64 Encoder/Decoder" description="Convert text to and from Base64 (supports Base64URL, missing padding, and whitespace). All processing happens locally in your browser.">
+    <ToolShell title="Base64 Encoder/Decoder" description="Convert text to and from Base64 (supports Base64URL, missing padding, and whitespace). All processing happens locally in your browser.">
       <Card elevation={1}>
         <div className="dual-pane" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 8 }}>
           <FormGroup className="resizable-group" label="Text" labelFor="b64-input">
@@ -127,7 +127,7 @@ const Base64Tool: React.FC = () => {
           </ButtonGroup>
         </div>
       </Card>
-    </ToolTemplate>
+    </ToolShell>
   );
 };
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Card, FormGroup, H3, Intent, Button, ButtonGroup, Classes } from '@blueprintjs/core';
-import ToolTemplate from '../components/ToolTemplate';
+import ToolShell from '../components/ui/ToolShell';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
 import { decodeSegment, tryParseJson, formatRelative, formatUtc } from '../utils/jwt';
 
@@ -91,7 +91,7 @@ const JWTDecoderTool: React.FC = () => {
   
 
   return (
-    <ToolTemplate
+    <ToolShell
       title="JWT Decoder"
       description="Decode JSON Web Tokens locally. Parses header and payload, handles Base64URL and pretty-prints JSON."
     >
@@ -223,7 +223,7 @@ const JWTDecoderTool: React.FC = () => {
           
         </FormGroup>
       </Card>
-    </ToolTemplate>
+    </ToolShell>
   );
 };
 
