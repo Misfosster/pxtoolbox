@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from 'react';
-import { Card, FormGroup, H3, Intent, Button, ButtonGroup, Classes } from '@blueprintjs/core';
+import { Card, H3, Intent, Button, ButtonGroup, Classes } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
 import { decodeSegment, tryParseJson, formatRelative, formatUtc } from '../utils/jwt';
 import CopyButton from '../components/ui/CopyButton';
 import OverlayActions from '../components/ui/OverlayActions';
 import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
+import Field from '../components/ui/Field';
+import MonospaceBlock from '../components/ui/MonospaceBlock';
 
 const JWTDecoderTool: React.FC = () => {
   const [token, setToken] = useState<string>('');
@@ -68,7 +70,7 @@ const JWTDecoderTool: React.FC = () => {
     >
       <Card elevation={1} style={{ marginBottom: 16, paddingBottom: 8 }}>
         <H3 style={{ marginTop: 0 }}>Token</H3>
-        <FormGroup label="JWT" labelFor="jwt-input">
+        <Field label="JWT" inputId="jwt-input">
           <ResizableTextArea
             id="jwt-input"
             placeholder="Paste JWT here (header.payload[.signature])"
@@ -76,7 +78,7 @@ const JWTDecoderTool: React.FC = () => {
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setToken(e.target.value.trim())}
             minRows={6}
           />
-        </FormGroup>
+        </Field>
         <ButtonGroup>
           <Button icon="eraser" onClick={() => setToken('')} disabled={!token}>
             Clear
@@ -87,13 +89,7 @@ const JWTDecoderTool: React.FC = () => {
 
       <Card elevation={1}>
         <H3 style={{ marginTop: 0 }}>Decoded</H3>
-        <FormGroup
-          className="resizable-group"
-          label="Header"
-          labelFor="jwt-header"
-          helperText={error ?? undefined}
-          intent={error ? Intent.DANGER : Intent.NONE}
-        >
+        <Field label="Header" inputId="jwt-header" helperText={error ?? undefined} error={error ?? null}>
           <div style={{ position: 'relative' }}>
             <ResizableTextArea id="jwt-header" value={headerPretty} readOnly minRows={6} style={{ paddingRight: 88, marginBottom: 0 }} />
             <OverlayActions>
@@ -110,27 +106,35 @@ const JWTDecoderTool: React.FC = () => {
               />
             </OverlayActions>
           </div>
-          
-        </FormGroup>
-        <FormGroup
-          className="resizable-group"
-          label="Payload"
-          labelFor="jwt-payload"
-        >
+        </Field>
+        <Field label="Payload" inputId="jwt-payload">
           <div style={{ position: 'relative' }}>
             {/* Visible viewer with per-line grey comments */}
-            <div style={{
-              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-              whiteSpace: 'pre',
-              overflowX: 'auto',
-              overflowY: 'hidden',
-              paddingRight: 88,
-              borderRadius: 3,
-              border: '1px solid rgba(138,155,168,0.15)',
-              background: 'rgba(16,22,26,0.3)',
-              padding: 8,
-              minHeight: 140,
-            }}>
+            <MonospaceBlock
+              text={payloadPretty}
+              actions={(
+                <OverlayActions>
+                  <Button
+                    icon={showPayloadHints ? 'eye-open' : 'eye-off'}
+                    minimal
+                    small
+                    aria-label={showPayloadHints ? 'Hide hints' : 'Show hints'}
+                    onClick={() => setShowPayloadHints((v) => !v)}
+                  />
+                  <CopyButton
+                    icon="clipboard"
+                    successIcon="tick"
+                    intent={Intent.PRIMARY}
+                    minimal
+                    small
+                    ariaLabel="Copy payload"
+                    testId="copy-payload-btn"
+                    text={payloadCopyText}
+                    disabled={!payloadPretty}
+                  />
+                </OverlayActions>
+              )}
+            />
               {payloadPretty.split('\n').map((line, idx) => {
                 const match = line.match(/"(nbf|iat|exp)"\s*:\s*(\d+)/);
                 let hint: string | null = null;
@@ -151,33 +155,11 @@ const JWTDecoderTool: React.FC = () => {
                   </div>
                 );
               })}
-            </div>
             {/* Hidden textarea kept for selection APIs and tests */}
             <textarea id="jwt-payload" value={payloadPretty} readOnly style={{ position: 'absolute', opacity: 0, pointerEvents: 'none', height: 0, width: 0, resize: 'none' }} />
-            <OverlayActions>
-              <Button
-                icon={showPayloadHints ? 'eye-open' : 'eye-off'}
-                minimal
-                small
-                aria-label={showPayloadHints ? 'Hide hints' : 'Show hints'}
-                onClick={() => setShowPayloadHints((v) => !v)}
-              />
-              <CopyButton
-                icon="clipboard"
-                successIcon="tick"
-                intent={Intent.PRIMARY}
-                minimal
-                small
-                ariaLabel="Copy payload"
-                testId="copy-payload-btn"
-                text={payloadCopyText}
-                disabled={!payloadPretty}
-              />
-            </OverlayActions>
           </div>
-          
-        </FormGroup>
-        <FormGroup className="resizable-group" label="Signature (raw)" labelFor="jwt-signature">
+        </Field>
+        <Field label="Signature (raw)" inputId="jwt-signature">
           <div style={{ position: 'relative' }}>
             <ResizableTextArea id="jwt-signature" value={signatureText} readOnly minRows={3} style={{ paddingRight: 88, marginBottom: 0 }} />
             <OverlayActions>
@@ -194,8 +176,7 @@ const JWTDecoderTool: React.FC = () => {
               />
             </OverlayActions>
           </div>
-          
-        </FormGroup>
+        </Field>
       </Card>
     </ToolShell>
   );

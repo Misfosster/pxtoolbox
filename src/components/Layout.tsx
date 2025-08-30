@@ -17,7 +17,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const isToolsRoute = useMemo(() => pathname.startsWith('/tools'), [pathname]);
-  const [toolsOpen, setToolsOpen] = useState<boolean>(isToolsRoute);
+  const [toolsOpen, setToolsOpen] = useState<boolean>(true);
 
   useEffect(() => {
     if (isToolsRoute) setToolsOpen(true);
