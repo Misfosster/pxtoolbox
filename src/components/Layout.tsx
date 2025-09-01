@@ -52,6 +52,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                   text={tool.label}
                   active={pathname === `/tools/${tool.path}`}
                   onClick={() => navigate(`/tools/${tool.path}`)}
+                  style={{ marginBottom: 6 }}
                 />
               ))}
               <MenuItem
