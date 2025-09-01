@@ -13,6 +13,7 @@ export interface ToolDefinition {
 // Consumers should import this registry to render navigation and routes.
 import Base64Tool from '../tools/Base64Tool';
 import JWTDecoderTool from '../tools/JWTDecoderTool';
+import URLEncodeTool from '../tools/URLEncodeTool';
 
 export const toolsRegistry: ToolDefinition[] = [
 	{
@@ -23,6 +24,15 @@ export const toolsRegistry: ToolDefinition[] = [
 		component: Base64Tool,
 		showInMenu: true,
 		order: 10,
+	},
+	{
+		id: 'url',
+		label: 'URL Encoder/Decoder',
+		icon: 'link',
+		path: 'url',
+		component: URLEncodeTool,
+		showInMenu: true,
+		order: 15,
 	},
 	{
 		id: 'jwt',

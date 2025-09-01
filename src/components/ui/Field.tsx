@@ -7,7 +7,7 @@ export interface FieldProps {
   /** Id of the primary input (used for labelFor) */
   inputId: string;
   /** Optional helper or error text */
-  helperText?: string;
+  helperText?: React.ReactNode;
   /** When provided, switches helper text to danger intent */
   error?: string | null;
   /** Child control to render within the field */
