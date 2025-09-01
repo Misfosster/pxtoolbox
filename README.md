@@ -4,14 +4,15 @@ A developer utilities platform built for incremental development during William'
 
 ## Current Status
 
-**Base project ready** and first tool implemented.
+**Core app ready.** Multiple tools implemented and tested.
 
 ### Implemented
 - **Base64 Encoder/Decoder**: Encode/decode with Base64URL support, auto-padding, whitespace tolerance, copy buttons, and clear error states. Route: `/#/tools/base64`.
+- **JWT Decoder**: Paste a JWT to view decoded header and payload (pretty‑printed). Shows helper hints for `nbf`, `iat`, `exp` with UTC and relative times; toggle hints visibility; copy buttons per section. Route: `/#/tools/jwt`.
+- **URL Encoder/Decoder**: Convert text to and from URL encoding using `encodeURIComponent`/`decodeURIComponent`. Treats `+` as space on decode. Copy buttons and clear action included. Route: `/#/tools/url`.
 
 ### Planned Features
-- **JWT Token Decoder**: Decode and inspect JWT tokens
-- **Text Transformation Tools**: Base64, URL encoding/decoding, JSON formatting  
+- **JSON Formatter**: Pretty‑print and minify JSON  
 - **Hash Generators**: MD5, SHA1, SHA256
 - **Case Converters**: camelCase, snake_case, kebab-case
 - **API Testing Tools**: Quick HTTP requests and response formatting
@@ -108,7 +109,20 @@ The `dist/` output can be served by any static file server. No backend required.
 
 ## Available Tools
 
-Coming soon as part of incremental development.
+- **Base64 Encoder/Decoder** (`/#/tools/base64`)
+  - Enter text (left) to see Base64 (right), or paste Base64 (right) to decode text (left)
+  - Tolerant of Base64URL, missing padding, and whitespace
+  - Copy buttons and clear action
+
+- **JWT Decoder** (`/#/tools/jwt`)
+  - Paste a token to decode header and payload; signature shown raw
+  - Helper hints for `nbf`, `iat`, `exp` with UTC and relative times (toggleable)
+  - Copy buttons for header and payload
+
+- **URL Encoder/Decoder** (`/#/tools/url`)
+  - Encode text to URL‑encoded form or decode URL‑encoded input back to text
+  - Uses `encodeURIComponent`/`decodeURIComponent`; treats `+` as space on decode
+  - Copy buttons and clear action
 
 ## License
 
