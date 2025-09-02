@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { Button, ButtonGroup, Card, Intent } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
@@ -6,21 +6,37 @@ import Field from '../components/ui/Field';
 import CopyButton from '../components/ui/CopyButton';
 import OverlayActions from '../components/ui/OverlayActions';
 import { prettyPrintJson, tryParseJson, minifyJson } from '../utils/json';
+import JsonFoldView, { type JsonFoldViewApi } from '../components/ui/JsonFoldView';
 
 const JSONFormatterTool: React.FC = () => {
   const [rawInput, setRawInput] = useState<string>('');
   const [formatted, setFormatted] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const treeApiRef = useRef<JsonFoldViewApi | null>(null);
 
   const leftCount = rawInput.length;
   const rightCount = formatted.length;
 
+  const parsedForTree = useMemo(() => {
+    if (formatted) {
+      const r = tryParseJson(formatted);
+      if (!r.error) return r.value;
+    }
+    if (rawInput) {
+      const r = tryParseJson(rawInput);
+      if (!r.error) return r.value;
+    }
+    return null;
+  }, [formatted, rawInput]);
+
   function handleLeftChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
+    const prevScroll = { x: window.scrollX, y: window.scrollY };
     const next = e.target.value;
     setRawInput(next);
     if (!next.trim()) {
       setFormatted('');
       setError(null);
+      requestAnimationFrame(() => window.scrollTo(prevScroll.x, prevScroll.y));
       return;
     }
     const result = tryParseJson(next);
@@ -31,15 +47,18 @@ const JSONFormatterTool: React.FC = () => {
       setFormatted(prettyPrintJson(result.value));
       setError(null);
     }
+    requestAnimationFrame(() => window.scrollTo(prevScroll.x, prevScroll.y));
   }
 
   function handleRightChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
     // Allow editing the formatted JSON; validate and keep rawInput in sync (minified)
+    const prevScroll = { x: window.scrollX, y: window.scrollY };
     const next = e.target.value;
     setFormatted(next);
     if (!next.trim()) {
       setRawInput('');
       setError(null);
+      requestAnimationFrame(() => window.scrollTo(prevScroll.x, prevScroll.y));
       return;
     }
     const result = tryParseJson(next);
@@ -50,6 +69,7 @@ const JSONFormatterTool: React.FC = () => {
       setRawInput(minifyJson(result.value));
       setError(null);
     }
+    requestAnimationFrame(() => window.scrollTo(prevScroll.x, prevScroll.y));
   }
 
   function handleFormat() {
@@ -148,7 +168,22 @@ const JSONFormatterTool: React.FC = () => {
                 onChange={handleRightChange}
                 minRows={10}
                 autosize
-                style={{ marginBottom: 0, paddingRight: 88 }}
+                style={{ marginBottom: 0, paddingRight: 0 }}
+              />
+            </div>
+            <div style={{ marginTop: 8, position: 'relative' }}>
+              <JsonFoldView
+                value={parsedForTree}
+                style={{ paddingRight: 160 }}
+                apiRef={(api) => (treeApiRef.current = api)}
+                onChange={(next) => {
+                  const prevScroll = { x: window.scrollX, y: window.scrollY };
+                  const pretty = prettyPrintJson(next);
+                  setFormatted(pretty);
+                  setRawInput(minifyJson(next));
+                  // restore scroll to avoid jump-to-top when content height changes above
+                  requestAnimationFrame(() => window.scrollTo(prevScroll.x, prevScroll.y));
+                }}
               />
               <OverlayActions>
                 <CopyButton
@@ -158,6 +193,20 @@ const JSONFormatterTool: React.FC = () => {
                   text={formatted}
                   disabled={!formatted || !!error}
                   label="Copy formatted"
+                />
+                <Button
+                  icon="chevron-down"
+                  minimal
+                  small
+                  onClick={() => treeApiRef.current?.expandAll()}
+                  aria-label="Expand all"
+                />
+                <Button
+                  icon="chevron-right"
+                  minimal
+                  small
+                  onClick={() => treeApiRef.current?.collapseAll()}
+                  aria-label="Collapse all"
                 />
               </OverlayActions>
             </div>
