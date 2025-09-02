@@ -14,6 +14,7 @@ export interface ToolDefinition {
 import Base64Tool from '../tools/Base64Tool';
 import JWTDecoderTool from '../tools/JWTDecoderTool';
 import URLEncodeTool from '../tools/URLEncodeTool';
+import JSONFormatterTool from '../tools/JSONFormatterTool';
 
 export const toolsRegistry: ToolDefinition[] = [
 	{
@@ -24,6 +25,15 @@ export const toolsRegistry: ToolDefinition[] = [
 		component: Base64Tool,
 		showInMenu: true,
 		order: 10,
+	},
+	{
+		id: 'json',
+		label: 'JSON Formatter',
+		icon: 'code',
+		path: 'json',
+		component: JSONFormatterTool,
+		showInMenu: true,
+		order: 12,
 	},
 	{
 		id: 'url',
