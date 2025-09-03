@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState, useLayoutEffect, useRef } from 'react';
 
 export interface JsonFoldViewApi {
   expandAll: () => void;
@@ -40,9 +40,12 @@ function getAllPaths(v: unknown, base: string = '$'): string[] {
   return results;
 }
 
-const indentSize = 16;
+//const indentSize = 12;
 
 const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, className, style, apiRef, onChange }) => {
+  const containerRef = useRef<HTMLDivElement | null>(null);
+  const [connectorPaths, setConnectorPaths] = useState<string[]>([]);
+  const [svgHeight, setSvgHeight] = useState<number>(0);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set());
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [editingText, setEditingText] = useState<string>('');
@@ -181,6 +184,14 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
     background: 'rgba(138,155,168,0.12)'
   } as const;
 
+  // Branch guides (short stubs per row) + horizontal parent→toggle connector
+  const guideColor = 'rgba(138,155,168,0.25)';
+  // removed CSS guides; using SVG connectors instead
+
+
+  const rowGapPx = 10;
+  const chipGapPx = 10;
+
   function keyChipStyle(): React.CSSProperties {
     return {
       ...chipBase,
@@ -195,10 +206,25 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
       return { ...chipBase, border: '1px solid rgba(138,155,168,0.45)', background: 'rgba(138,155,168,0.18)' };
     }
     if (t === 'string') {
+      const text = String(v);
+      const numericLike = /^-?\d+(?:\.\d+)?$/.test(text);
+      if (numericLike) {
+        return {
+          ...chipBase,
+          border: '1px solid rgba(186,129,255,0.55)',
+          background: 'rgba(186,129,255,0.18)',
+          color: '#C792EA'
+        };
+      }
       return { ...chipBase, border: '1px solid rgba(72,207,173,0.45)', background: 'rgba(72,207,173,0.16)' };
     }
     if (t === 'number') {
-      return { ...chipBase, border: '1px solid rgba(186,129,255,0.45)', background: 'rgba(186,129,255,0.16)' };
+      return {
+        ...chipBase,
+        border: '1px solid rgba(186,129,255,0.55)',
+        background: 'rgba(186,129,255,0.18)',
+        color: '#C792EA'
+      };
     }
     if (t === 'boolean') {
       return { ...chipBase, border: '1px solid rgba(255,191,0,0.45)', background: 'rgba(255,191,0,0.16)' };
@@ -216,19 +242,30 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
     background: 'rgba(138,155,168,0.15)',
     borderRadius: 3,
     fontSize: 12,
-    cursor: 'pointer'
+    cursor: 'pointer',
+    marginRight: 8,
+    position: 'relative',
+    zIndex: 1
   };
 
   function renderNode(node: unknown, path: string, depth: number, keyLabel?: string): React.ReactNode {
-    const paddingLeft = depth * indentSize;
+    // Spacing rationale:
+    // We render toggle buttons and SVG connectors in the same horizontal lane as the chips.
+    // Using a pure multiplier (depth * indentSize) left a visually large gutter on some rows
+    // due to overlay/connector geometry. Empirically, aligning content with `depth + 24`px
+    // produces consistent spacing across arrays/objects and keeps connectors snug to toggles.
+    // Mobile note: treat `24` as a base offset for the toggle lane. In a future responsive
+    // pass we can reduce or increase this value based on viewport width to maintain readable
+    // alignment and tap targets.
+    const paddingLeft = depth+24;
     if (Array.isArray(node)) {
       const isCollapsed = collapsed.has(path);
       return (
-        <div style={{ paddingLeft }}>
+        <div style={{ paddingLeft, position: 'relative' }}>
           <div
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'default', userSelect: 'none' }}
+            style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: chipGapPx, cursor: 'default', userSelect: 'none', marginBottom: rowGapPx }}
           >
-            <span onClick={() => toggle(path)} title={isCollapsed ? 'Expand' : 'Collapse'} style={toggleBoxStyle}>
+            <span data-toggle-path={path} onClick={() => toggle(path)} title={isCollapsed ? 'Expand' : 'Collapse'} style={toggleBoxStyle}>
               {isCollapsed ? '+' : '-'}
             </span>
             {keyLabel ? (
@@ -277,11 +314,11 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
       const isCollapsed = collapsed.has(path);
       const keys = Object.keys(node);
       return (
-        <div style={{ paddingLeft }}>
+        <div style={{ paddingLeft, position: 'relative' }}>
           <div
-            style={{ display: 'inline-flex', alignItems: 'center', gap: 8, cursor: 'default', userSelect: 'none' }}
+            style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: chipGapPx, cursor: 'default', userSelect: 'none', marginBottom: rowGapPx }}
           >
-            <span onClick={() => toggle(path)} title={isCollapsed ? 'Expand' : 'Collapse'} style={toggleBoxStyle}>
+            <span data-toggle-path={path} onClick={() => toggle(path)} title={isCollapsed ? 'Expand' : 'Collapse'} style={toggleBoxStyle}>
               {isCollapsed ? '+' : '-'}
             </span>
             {keyLabel ? (
@@ -330,7 +367,9 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
     // Primitive
     const isEditing = editingValuePath === path;
     return (
-      <div style={{ paddingLeft, display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <div style={{ paddingLeft }}>
+        <div style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: chipGapPx, marginBottom: rowGapPx }}>
+          {/* Primitive rows have no toggle connectors */}
         {keyLabel ? (
           editingPath === path ? (
             <input
@@ -380,29 +419,82 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
             {valueToLabel(node)}
           </span>
         )}
+        </div>
       </div>
     );
   }
 
+  // Build parent→child toggle positions and draw once per render
+  useLayoutEffect(() => {
+    let raf = 0;
+    const measure = () => {
+      try {
+        const container = containerRef.current;
+        if (!container) return;
+        const rootRect = container.getBoundingClientRect();
+        const toggles = Array.from(container.querySelectorAll('[data-toggle-path]')) as HTMLElement[];
+        const pos = new Map<string, { x: number; y: number }>();
+        for (const el of toggles) {
+          const r = el.getBoundingClientRect();
+          const key = el.getAttribute('data-toggle-path');
+          if (!key) continue;
+          pos.set(key, {
+            x: r.left - rootRect.left + r.width / 2,
+            y: r.top - rootRect.top + r.height / 2,
+          });
+        }
+        const edges: string[] = [];
+        for (const el of toggles) {
+          const childKey = el.getAttribute('data-toggle-path');
+          if (!childKey || childKey === '$') continue;
+          const lastDot = childKey.lastIndexOf('.');
+          const lastBracket = childKey.lastIndexOf('[');
+          const parentKey = lastDot > lastBracket ? childKey.slice(0, lastDot) : childKey.slice(0, lastBracket);
+          const a = pos.get(parentKey);
+          const b = pos.get(childKey);
+          if (!a || !b) continue;
+          const bx = b.x - 8;
+          edges.push(`M ${a.x} ${a.y} L ${a.x} ${b.y} L ${bx} ${b.y}`);
+        }
+        setConnectorPaths(edges);
+        setSvgHeight(container.scrollHeight || container.clientHeight);
+      } catch {
+        // ignore measurement errors during hot reload
+      }
+    };
+    raf = window.requestAnimationFrame(measure);
+    return () => window.cancelAnimationFrame(raf);
+  }, [value, collapsed]);
+
   return (
-    <div
-      style={{
-        position: 'relative',
-        fontFamily:
-          'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-        whiteSpace: wrap ? 'pre-wrap' : 'pre',
-        overflowX: wrap ? 'hidden' : 'auto',
-        overflowY: 'hidden',
-        borderRadius: 3,
-        border: '1px solid rgba(138,155,168,0.15)',
-        background: 'rgba(16,22,26,0.3)',
-        padding: 8,
-        minHeight: 140,
-        ...style,
-      }}
-      className={className}
-    >
-      {renderNode(value, '$', 0)}
+    <div ref={containerRef} style={{ position: 'relative' }} className={className}>
+      <svg
+        width="100%"
+        height={svgHeight}
+        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
+      >
+        {connectorPaths.map((d, i) => (
+          <path key={i} d={d} stroke={guideColor} strokeWidth={1} fill="none" />
+        ))}
+      </svg>
+      <div
+        style={{
+          position: 'relative',
+          fontFamily:
+            'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+          whiteSpace: wrap ? 'pre-wrap' : 'pre',
+          overflowX: wrap ? 'hidden' : 'auto',
+          overflowY: 'hidden',
+          borderRadius: 3,
+          border: '1px solid rgba(138,155,168,0.15)',
+          background: 'rgba(16,22,26,0.3)',
+          padding: 8,
+          minHeight: 140,
+          ...style,
+        }}
+      >
+        {renderNode(value, '$', 0)}
+      </div>
     </div>
   );
 };
