@@ -294,7 +294,7 @@ textarea.bp5-input:focus:not(:focus-visible) {
   .sidebar {
     position: sticky;
     top: 0;
-    z-index: 1;
+    z-index: 20; /* ensure sidebar/header stays above in-content overlays on mobile */
   }
   .main-container {
     padding: 10px;

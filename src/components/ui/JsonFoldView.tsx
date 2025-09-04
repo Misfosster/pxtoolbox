@@ -43,6 +43,7 @@ function getAllPaths(v: unknown, base: string = '$'): string[] {
 //const indentSize = 12;
 
 const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, className, style, apiRef, onChange }) => {
+  // Container for the scrollable content (SVG overlays will be positioned within this element)
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [connectorPaths, setConnectorPaths] = useState<string[]>([]);
   const [svgHeight, setSvgHeight] = useState<number>(0);
@@ -51,6 +52,9 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
   const [editingText, setEditingText] = useState<string>('');
   const [editingValuePath, setEditingValuePath] = useState<string | null>(null);
   const [editingValueText, setEditingValueText] = useState<string>('');
+  // Responsive layout knobs
+  const [toggleBaseOffset, setToggleBaseOffset] = useState<number>(24);
+  const [toggleBoxSize, setToggleBoxSize] = useState<number>(18);
 
   const allPaths = useMemo(() => getAllPaths(value), [value]);
 
@@ -232,21 +236,23 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
     return { ...chipBase };
   }
 
-  const toggleBoxStyle: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 18,
-    height: 18,
-    border: '1px solid rgba(138,155,168,0.4)',
-    background: 'rgba(138,155,168,0.15)',
-    borderRadius: 3,
-    fontSize: 12,
-    cursor: 'pointer',
-    marginRight: 8,
-    position: 'relative',
-    zIndex: 1
-  };
+  function getToggleBoxStyle(): React.CSSProperties {
+    return {
+      display: 'inline-flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: toggleBoxSize,
+      height: toggleBoxSize,
+      border: '1px solid rgba(138,155,168,0.4)',
+      background: 'rgba(138,155,168,0.15)',
+      borderRadius: 3,
+      fontSize: 12,
+      cursor: 'pointer',
+      marginRight: 8,
+      position: 'relative',
+      zIndex: 1
+    };
+  }
 
   function renderNode(node: unknown, path: string, depth: number, keyLabel?: string): React.ReactNode {
     // Spacing rationale:
@@ -257,7 +263,7 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
     // Mobile note: treat `24` as a base offset for the toggle lane. In a future responsive
     // pass we can reduce or increase this value based on viewport width to maintain readable
     // alignment and tap targets.
-    const paddingLeft = depth+24;
+    const paddingLeft = depth + toggleBaseOffset;
     if (Array.isArray(node)) {
       const isCollapsed = collapsed.has(path);
       return (
@@ -265,7 +271,7 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
           <div
             style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: chipGapPx, cursor: 'default', userSelect: 'none', marginBottom: rowGapPx }}
           >
-            <span data-toggle-path={path} onClick={() => toggle(path)} title={isCollapsed ? 'Expand' : 'Collapse'} style={toggleBoxStyle}>
+            <span data-toggle-path={path} onClick={() => toggle(path)} title={isCollapsed ? 'Expand' : 'Collapse'} style={getToggleBoxStyle()}>
               {isCollapsed ? '+' : '-'}
             </span>
             {keyLabel ? (
@@ -318,7 +324,7 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
           <div
             style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', gap: chipGapPx, cursor: 'default', userSelect: 'none', marginBottom: rowGapPx }}
           >
-            <span data-toggle-path={path} onClick={() => toggle(path)} title={isCollapsed ? 'Expand' : 'Collapse'} style={toggleBoxStyle}>
+            <span data-toggle-path={path} onClick={() => toggle(path)} title={isCollapsed ? 'Expand' : 'Collapse'} style={getToggleBoxStyle()}>
               {isCollapsed ? '+' : '-'}
             </span>
             {keyLabel ? (
@@ -444,6 +450,7 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
           });
         }
         const edges: string[] = [];
+        const connectorNudge = Math.min(8, toggleBoxSize / 2);
         for (const el of toggles) {
           const childKey = el.getAttribute('data-toggle-path');
           if (!childKey || childKey === '$') continue;
@@ -453,7 +460,7 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
           const a = pos.get(parentKey);
           const b = pos.get(childKey);
           if (!a || !b) continue;
-          const bx = b.x - 8;
+          const bx = b.x - connectorNudge;
           edges.push(`M ${a.x} ${a.y} L ${a.x} ${b.y} L ${bx} ${b.y}`);
         }
         setConnectorPaths(edges);
@@ -464,20 +471,24 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
     };
     raf = window.requestAnimationFrame(measure);
     return () => window.cancelAnimationFrame(raf);
-  }, [value, collapsed]);
+  }, [value, collapsed, toggleBoxSize]);
+
+  // Responsive adjustments for offsets and tap targets
+  useEffect(() => {
+    const update = () => {
+      const w = window.innerWidth || 1024;
+      setToggleBaseOffset(w < 640 ? 18 : 24);
+      setToggleBoxSize(w < 640 ? 24 : 18);
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, []);
 
   return (
-    <div ref={containerRef} style={{ position: 'relative' }} className={className}>
-      <svg
-        width="100%"
-        height={svgHeight}
-        style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-      >
-        {connectorPaths.map((d, i) => (
-          <path key={i} d={d} stroke={guideColor} strokeWidth={1} fill="none" />
-        ))}
-      </svg>
+    <div style={{ position: 'relative' }} className={className}>
       <div
+        ref={containerRef}
         style={{
           position: 'relative',
           fontFamily:
@@ -493,6 +504,15 @@ const JsonFoldView: React.FC<JsonFoldViewProps> = ({ value, wrap = false, classN
           ...style,
         }}
       >
+        <svg
+          width="100%"
+          height={svgHeight}
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 0 }}
+        >
+          {connectorPaths.map((d, i) => (
+            <path key={i} d={d} stroke={guideColor} strokeWidth={1} fill="none" />
+          ))}
+        </svg>
         {renderNode(value, '$', 0)}
       </div>
     </div>

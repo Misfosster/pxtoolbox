@@ -41,10 +41,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             icon="wrench"
             text="Tools"
             aria-expanded={toolsOpen}
+            data-testid="sidebar-tools-toggle"
             onClick={() => setToolsOpen((v) => !v)}
           />
           <Collapse isOpen={toolsOpen} keepChildrenMounted>
-            <Menu className="sidebar-submenu">
+            <Menu className="sidebar-submenu" data-testid="sidebar-tools-submenu">
               {getVisibleTools().map((tool) => (
                 <MenuItem
                   key={tool.id}
