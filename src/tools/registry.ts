@@ -15,6 +15,7 @@ import Base64Tool from '../tools/Base64Tool';
 import JWTDecoderTool from '../tools/JWTDecoderTool';
 import URLEncodeTool from '../tools/URLEncodeTool';
 import JSONFormatterTool from '../tools/JSONFormatterTool';
+import DiffViewerTool from '../tools/DiffViewerTool';
 
 export const toolsRegistry: ToolDefinition[] = [
 	{
@@ -35,6 +36,15 @@ export const toolsRegistry: ToolDefinition[] = [
 		showInMenu: true,
 		order: 12,
 	},
+	{
+ 		id: 'diff',
+ 		label: 'Diff Viewer',
+ 		icon: 'comparison',
+ 		path: 'diff',
+ 		component: DiffViewerTool,
+ 		showInMenu: true,
+ 		order: 13,
+ 	},
 	{
 		id: 'url',
 		label: 'URL Encoder/Decoder',

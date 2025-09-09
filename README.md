@@ -11,6 +11,7 @@ A developer utilities platform built for incremental development during William'
 - **JWT Decoder**: Paste a JWT to view decoded header and payload (pretty‑printed). Shows helper hints for `nbf`, `iat`, `exp` with UTC and relative times; toggle hints visibility; copy buttons per section. Route: `/#/tools/jwt`.
 - **URL Encoder/Decoder**: Convert text to and from URL encoding using `encodeURIComponent`/`decodeURIComponent`. Treats `+` as space on decode. Copy buttons and clear action included. Route: `/#/tools/url`.
 - **JSON Formatter**: Validate, pretty‑print, and minify JSON. Editable formatted view and a foldable tree with inline key/value editing; autosize inputs; copy actions. Route: `/#/tools/json`.
+- **Diff Viewer (MVP)**: Side‑by‑side text inputs with a simple unified diff preview. Route: `/#/tools/diff`.
 
 ### Planned Features
 - **Hash Generators**: MD5, SHA1, SHA256
@@ -128,6 +129,11 @@ The `dist/` output can be served by any static file server. No backend required.
   - Validates as you type; auto‑formats on paste/type when valid
   - Editable formatted text on the left; foldable tree with inline editing on the right
   - Buttons to Format/Minify, copy actions, and autosizing inputs
+
+- **Diff Viewer (MVP)** (`/#/tools/diff`)
+  - Two text panes; shows a simple unified diff preview below
+  - Intended to evolve with a richer JSON tree + text diff view
+
 ## License
 
 MIT License - See LICENSE file for details.
