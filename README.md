@@ -10,9 +10,9 @@ A developer utilities platform built for incremental development during William'
 - **Base64 Encoder/Decoder**: Encode/decode with Base64URL support, auto-padding, whitespace tolerance, copy buttons, and clear error states. Route: `/#/tools/base64`.
 - **JWT Decoder**: Paste a JWT to view decoded header and payload (pretty‑printed). Shows helper hints for `nbf`, `iat`, `exp` with UTC and relative times; toggle hints visibility; copy buttons per section. Route: `/#/tools/jwt`.
 - **URL Encoder/Decoder**: Convert text to and from URL encoding using `encodeURIComponent`/`decodeURIComponent`. Treats `+` as space on decode. Copy buttons and clear action included. Route: `/#/tools/url`.
+- **JSON Formatter**: Validate, pretty‑print, and minify JSON. Editable formatted view and a foldable tree with inline key/value editing; autosize inputs; copy actions. Route: `/#/tools/json`.
 
 ### Planned Features
-- **JSON Formatter**: Pretty‑print and minify JSON  
 - **Hash Generators**: MD5, SHA1, SHA256
 - **Case Converters**: camelCase, snake_case, kebab-case
 - **API Testing Tools**: Quick HTTP requests and response formatting
@@ -124,6 +124,10 @@ The `dist/` output can be served by any static file server. No backend required.
   - Uses `encodeURIComponent`/`decodeURIComponent`; treats `+` as space on decode
   - Copy buttons and clear action
 
+- **JSON Formatter** (`/#/tools/json`)
+  - Validates as you type; auto‑formats on paste/type when valid
+  - Editable formatted text on the left; foldable tree with inline editing on the right
+  - Buttons to Format/Minify, copy actions, and autosizing inputs
 ## License
 
 MIT License - See LICENSE file for details.

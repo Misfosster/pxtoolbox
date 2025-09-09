@@ -5,9 +5,11 @@ export interface ResizableTextAreaProps extends TextAreaProps {
 	minRows?: number;
 	autosize?: boolean;
 	maxRows?: number;
+	/** Native CSS resize handle. Defaults to 'none'. When not 'none', autosize is disabled. */
+	resizable?: 'none' | 'vertical' | 'horizontal' | 'both';
 }
 
-const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, style, fill = true, size = 'large', inputRef, onChange, value, defaultValue, autosize = true, maxRows, ...rest }) => {
+const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, style, fill = true, size = 'large', inputRef, onChange, value, defaultValue, autosize = true, maxRows, resizable = 'none', ...rest }) => {
 	const elRef = useRef<HTMLTextAreaElement | null>(null);
 
 	function isRefObject(r: React.Ref<HTMLTextAreaElement> | undefined): r is React.MutableRefObject<HTMLTextAreaElement | null> {
@@ -34,19 +36,21 @@ const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, styl
 		el.style.height = `${next}px`;
 	}, [minRows, maxRows]);
 
+	const effectiveAutosize = autosize && resizable === 'none';
+
 	useLayoutEffect(() => {
-		if (!autosize) return;
+		if (!effectiveAutosize) return;
 		fit();
 		const el = elRef.current;
 		if (!el) return;
 		const ro = new ResizeObserver(() => fit());
 		ro.observe(el);
 		return () => ro.disconnect();
-	}, [autosize, fit]);
+	}, [effectiveAutosize, fit]);
 
 	useEffect(() => {
-		if (autosize) fit();
-	}, [value, defaultValue, autosize, fit]);
+		if (effectiveAutosize) fit();
+	}, [value, defaultValue, effectiveAutosize, fit]);
 
 	return (
 		<TextArea
@@ -57,10 +61,16 @@ const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, styl
 			fill={fill}
 			size={size}
 			inputRef={setRef}
-			style={{ ...style, resize: 'none', marginBottom: 0, height: autosize ? undefined : '100%', overflow: autosize && maxRows ? 'auto' : autosize ? undefined : 'auto' }}
+			style={{
+				...style,
+				resize: resizable,
+				marginBottom: 0,
+				height: effectiveAutosize ? undefined : undefined,
+				overflow: effectiveAutosize && maxRows ? 'auto' : effectiveAutosize ? undefined : 'auto',
+			}}
 			onChange={(e) => {
 				if (onChange) onChange(e);
-				if (autosize) requestAnimationFrame(() => fit());
+				if (effectiveAutosize) requestAnimationFrame(() => fit());
 			}}
 		/>
 	);
