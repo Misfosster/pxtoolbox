@@ -1,23 +1,82 @@
 import React, { useMemo, useRef, useState, useLayoutEffect } from 'react';
-import { Button, Card } from '@blueprintjs/core';
+import { Button, Card, Switch } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
 import Field from '../components/ui/Field';
+import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
 
-function simpleDiff(a: string, b: string): string {
+// LCS-based line diff to properly handle insertions/deletions and minimize churn
+function normalizeLineForWhitespace(s: string): string {
+  return s.replace(/\s+/g, ' ').trim();
+}
+
+function lcsLineDiff(a: string, b: string, ignoreWhitespace: boolean): string {
   if (!a && !b) return '';
+  if (!a && b) return b.split(/\r?\n/).map((l) => '+ ' + l).join('\n');
+  if (a && !b) return a.split(/\r?\n/).map((l) => '- ' + l).join('\n');
   const aLines = a.split(/\r?\n/);
   const bLines = b.split(/\r?\n/);
-  const max = Math.max(aLines.length, bLines.length);
-  const out: string[] = [];
-  for (let i = 0; i < max; i++) {
-    const left = aLines[i] ?? '';
-    const right = bLines[i] ?? '';
-    if (left === right) out.push('  ' + left);
-    else {
-      if (left) out.push('- ' + left);
-      if (right) out.push('+ ' + right);
+  const aCmp = ignoreWhitespace ? aLines.map(normalizeLineForWhitespace) : aLines;
+  const bCmp = ignoreWhitespace ? bLines.map(normalizeLineForWhitespace) : bLines;
+  const n = aLines.length;
+  const m = bLines.length;
+  // DP table of LCS lengths
+  const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+  for (let i = n - 1; i >= 0; i--) {
+    const ai = aCmp[i];
+    for (let j = m - 1; j >= 0; j--) {
+      dp[i][j] = ai === bCmp[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
     }
+  }
+  // Reconstruct edit script with a small lookahead heuristic:
+  // Prefer classifying single-line insert/delete when it keeps alignment; otherwise emit a modify pair (- then +).
+  const out: string[] = [];
+  let i = 0;
+  let j = 0;
+  while (i < n && j < m) {
+    if (aCmp[i] === bCmp[j]) {
+      out.push('  ' + aLines[i]);
+      i++;
+      j++;
+      continue;
+    }
+    // Tie-breaker using lookahead to keep alignment intuitive
+    const delKeepsAlign = i + 1 < n && aLines[i + 1] === bLines[j];
+    const addKeepsAlign = j + 1 < m && aLines[i] === bLines[j + 1];
+    if (delKeepsAlign && !addKeepsAlign) {
+      out.push('- ' + aLines[i]);
+      i++;
+      continue;
+    }
+    if (addKeepsAlign && !delKeepsAlign) {
+      out.push('+ ' + bLines[j]);
+      j++;
+      continue;
+    }
+    // Fall back to DP direction when clearly better
+    if (dp[i + 1][j] > dp[i][j + 1]) {
+      out.push('- ' + aLines[i]);
+      i++;
+      continue;
+    }
+    if (dp[i + 1][j] < dp[i][j + 1]) {
+      out.push('+ ' + bLines[j]);
+      j++;
+      continue;
+    }
+    // Otherwise treat as modification (pair)
+    out.push('- ' + aLines[i]);
+    out.push('+ ' + bLines[j]);
+    i++;
+    j++;
+  }
+  while (i < n) {
+    out.push('- ' + aLines[i]);
+    i++;
+  }
+  while (j < m) {
+    out.push('+ ' + bLines[j]);
+    j++;
   }
   return out.join('\n');
 }
@@ -50,6 +109,13 @@ const DiffViewerTool: React.FC = () => {
     setRightMetrics({ lineHeight: lh, paddingTop: pt });
   }, [rightText]);
 
+  // Fixed gutter width to contain both line numbers and any inline indicators
+  const GUTTER_WIDTH_PX = 40; // shared by textareas and preview
+  const GUTTER_INNER_LEFT_PX = 0; // minimal space before numbers
+  const CONTENT_GAP_PX = 8; // space between gutter and text content
+  const MIN_ROWS = 16; // revert to shorter vertical size
+  const PREVIEW_HEIGHT = 300; // moderate preview height
+
   function computeGutter(text: string, el: HTMLTextAreaElement | null): string {
     if (!text) return '';
     if (!el) return text.split('\n').map((_, i) => String(i + 1)).join('\n');
@@ -61,13 +127,29 @@ const DiffViewerTool: React.FC = () => {
     const ctx = canvas.getContext('2d');
     if (!ctx) return text.split('\n').map((_, i) => String(i + 1)).join('\n');
     ctx.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
-    const charWidth = ctx.measureText('M').width || 8;
-    const columns = Math.max(1, Math.floor(contentWidth / charWidth));
+    const measure = (s: string) => ctx!.measureText(s).width;
+
+    function countWrapsForLine(line: string): number {
+      if (!line) return 1;
+      let width = 0;
+      let wraps = 1;
+      for (let idx = 0; idx < line.length; idx++) {
+        const ch = line[idx];
+        const w = measure(ch);
+        if (width + w <= contentWidth || width === 0) {
+          width += w;
+        } else {
+          wraps++;
+          width = w;
+        }
+      }
+      return Math.max(1, wraps);
+    }
     const gutterLines: string[] = [];
     const logical = text.split('\n');
     for (let i = 0; i < logical.length; i++) {
       const line = logical[i];
-      const wraps = Math.max(1, Math.ceil((line.length || 1) / columns));
+      const wraps = countWrapsForLine(line);
       gutterLines.push(String(i + 1));
       for (let j = 1; j < wraps; j++) gutterLines.push('');
     }
@@ -92,16 +174,28 @@ const DiffViewerTool: React.FC = () => {
     return () => ro.disconnect();
   }, [rightText]);
 
-  const diffText = useMemo(() => simpleDiff(leftText, rightText), [leftText, rightText]);
+  const [ignoreWs, setIgnoreWs] = useLocalStorageBoolean('pxtoolbox.diff.ignoreWhitespace', false);
+  const [charInline, setCharInline] = useLocalStorageBoolean('pxtoolbox.diff.inlineChar', true);
+  const diffText = useMemo(() => lcsLineDiff(leftText, rightText, ignoreWs), [leftText, rightText, ignoreWs]);
 
   return (
     <ToolShell
       title="Diff Viewer"
-      description="Compare two texts side by side. Unified diff is shown centered below."
+      description="Compare two texts side by side. Inline diffs use word-level by default; enable the toggle to diff per character. Unified diff is shown centered below."
     >
       <Card elevation={1}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'nowrap', alignItems: 'stretch' }}>
-          <div style={{ flex: '1 1 0', minWidth: 0 }}>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>Ignore whitespace</span>
+            <Switch checked={ignoreWs} onChange={(e) => setIgnoreWs((e.currentTarget as HTMLInputElement).checked)} aria-label="Ignore whitespace" label={undefined} style={{ margin: 0 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>Character-level inline</span>
+            <Switch checked={charInline} onChange={(e) => setCharInline((e.currentTarget as HTMLInputElement).checked)} aria-label="Character-level inline" label={undefined} style={{ margin: 0 }} />
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'nowrap', alignItems: 'stretch' }}>
+          <div style={{ flex: '1 1 600px', minWidth: 520 }}>
             <Field label="Original" inputId="diff-left">
               <div style={{ position: 'relative' }}>
                 <ResizableTextArea
@@ -109,10 +203,10 @@ const DiffViewerTool: React.FC = () => {
                   value={leftText}
                   onChange={(e) => setLeftText(e.target.value)}
                   placeholder="Paste original text…"
-                  minRows={16}
+                  minRows={MIN_ROWS}
                   autosize
                   style={{
-                    paddingLeft: 48,
+                    paddingLeft: GUTTER_WIDTH_PX + CONTENT_GAP_PX,
                     whiteSpace: 'pre-wrap',
                     overflowX: 'hidden',
                     fontFamily:
@@ -124,9 +218,9 @@ const DiffViewerTool: React.FC = () => {
                   aria-hidden
                   style={{
                     position: 'absolute',
-                    left: 8,
+                    left: GUTTER_INNER_LEFT_PX,
                     top: leftMetrics.paddingTop,
-                    width: 38,
+                    width: GUTTER_WIDTH_PX - GUTTER_INNER_LEFT_PX,
                     textAlign: 'right',
                     color: 'rgba(138,155,168,0.7)',
                     userSelect: 'none',
@@ -142,7 +236,7 @@ const DiffViewerTool: React.FC = () => {
               </div>
             </Field>
           </div>
-          <div style={{ flex: '1 1 0', minWidth: 0 }}>
+          <div style={{ flex: '1 1 600px', minWidth: 520 }}>
             <Field label="Altered" inputId="diff-right">
               <div style={{ position: 'relative' }}>
                 <ResizableTextArea
@@ -150,10 +244,10 @@ const DiffViewerTool: React.FC = () => {
                   value={rightText}
                   onChange={(e) => setRightText(e.target.value)}
                   placeholder="Paste altered text…"
-                  minRows={16}
+                  minRows={MIN_ROWS}
                   autosize
                   style={{
-                    paddingLeft: 48,
+                    paddingLeft: GUTTER_WIDTH_PX + CONTENT_GAP_PX,
                     whiteSpace: 'pre-wrap',
                     overflowX: 'hidden',
                     fontFamily:
@@ -165,9 +259,9 @@ const DiffViewerTool: React.FC = () => {
                   aria-hidden
                   style={{
                     position: 'absolute',
-                    left: 8,
+                    left: GUTTER_INNER_LEFT_PX,
                     top: rightMetrics.paddingTop,
-                    width: 38,
+                    width: GUTTER_WIDTH_PX - GUTTER_INNER_LEFT_PX,
                     textAlign: 'right',
                     color: 'rgba(138,155,168,0.7)',
                     userSelect: 'none',
@@ -191,11 +285,12 @@ const DiffViewerTool: React.FC = () => {
                 id="diff-output"
                 style={{
                   width: '100%',
-                  height: 260,
-                  overflow: 'auto',
+                  height: PREVIEW_HEIGHT,
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
                   resize: 'both',
                   fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-                  whiteSpace: 'pre',
+                  whiteSpace: 'normal',
                   border: '1px solid rgba(138,155,168,0.15)',
                   borderRadius: 3,
                   background: 'rgba(16,22,26,0.3)',
@@ -225,19 +320,20 @@ const DiffViewerTool: React.FC = () => {
                       <div
                         key={`l-${displayNum}-${marker}`}
                         style={{
-                          display: 'flex',
+                          display: 'grid',
+                          gridTemplateColumns: `${GUTTER_WIDTH_PX}px 1fr`,
+                          columnGap: CONTENT_GAP_PX,
                           alignItems: 'baseline',
-                          gap: 10,
-                          padding: '0 6px',
+                          padding: '0 6px 0 0',
                           background: bg,
                           color: fg,
                         }}
                       >
-                        <span style={{ width: 46, textAlign: 'right', color: 'rgba(138,155,168,0.7)', userSelect: 'none' }}>
-                          {displayNum}
+                        <span style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline', gap: 6, color: 'rgba(138,155,168,0.7)', userSelect: 'none' }}>
+                          <span style={{ width: 14, textAlign: 'center' }}>{marker !== ' ' ? marker : ''}</span>
+                          <span>{displayNum}</span>
                         </span>
-                        <span style={{ whiteSpace: 'pre-wrap' }}>
-                          {marker !== ' ' ? marker + ' ' : '  '}
+                        <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere', minWidth: 0 }}>
                           {segments
                             ? segments.map((s, i) => (
                                 <span
@@ -245,8 +341,8 @@ const DiffViewerTool: React.FC = () => {
                                   style={
                                     s.changed
                                       ? (s.diffType === 'add'
-                                          ? { background: 'rgba(46, 160, 67, 0.55)', color: '#c0ffd0', borderRadius: 2, padding: '0 2px', fontWeight: 600 }
-                                          : { background: 'rgba(248, 81, 73, 0.55)', color: '#ffd1cc', borderRadius: 2, padding: '0 2px', fontWeight: 600 }
+                                          ? { background: 'rgba(46, 160, 67, 0.55)', color: '#c0ffd0', borderRadius: 2, fontWeight: 600 }
+                                          : { background: 'rgba(248, 81, 73, 0.55)', color: '#ffd1cc', borderRadius: 2, fontWeight: 600 }
                                         )
                                       : undefined
                                   }
@@ -260,32 +356,94 @@ const DiffViewerTool: React.FC = () => {
                     );
                   }
 
-                  function splitInline(a: string, b: string): [DiffSeg[], DiffSeg[]] {
-                    let start = 0;
-                    const maxStart = Math.min(a.length, b.length);
-                    while (start < maxStart && a[start] === b[start]) start++;
-                    let end = 0;
-                    const aRem = a.length - start;
-                    const bRem = b.length - start;
-                    const maxEnd = Math.min(aRem, bRem);
-                    while (end < maxEnd && a[a.length - 1 - end] === b[b.length - 1 - end]) end++;
-                    if (start + end > a.length) end = Math.max(0, a.length - start);
-                    if (start + end > b.length) end = Math.max(0, b.length - start);
-                    const aMid = a.slice(start, a.length - end);
-                    const bMid = b.slice(start, b.length - end);
-                    const commonStart = a.slice(0, start);
-                    const commonEnd = a.slice(a.length - end);
-                    const aSegs: DiffSeg[] = [
-                      { text: commonStart, changed: false },
-                      { text: aMid, changed: true, diffType: 'del' },
-                      { text: commonEnd, changed: false },
-                    ];
-                    const bSegs: DiffSeg[] = [
-                      { text: commonStart, changed: false },
-                      { text: bMid, changed: true, diffType: 'add' },
-                      { text: commonEnd, changed: false },
-                    ];
-                    return [aSegs, bSegs];
+                  function mergedSegments(a: string, b: string, ignoreWhitespace: boolean, mode: 'char' | 'word'): DiffSeg[] {
+                    if (a === b) return [{ text: a, changed: false }];
+
+                    // Build normalized token arrays either per char or per word, with mapping back to original slices
+                    const buildNorm = (src: string) => {
+                      const norm: string[] = [];
+                      const map: string[] = [];
+                      if (mode === 'char') {
+                        let i = 0;
+                        while (i < src.length) {
+                          const ch = src[i];
+                          if (ignoreWhitespace && /\s/.test(ch)) {
+                            let j = i + 1;
+                            while (j < src.length && /\s/.test(src[j])) j++;
+                            norm.push(' ');
+                            map.push(src.slice(i, j));
+                            i = j;
+                          } else {
+                            norm.push(ch);
+                            map.push(ch);
+                            i++;
+                          }
+                        }
+                      } else {
+                        // word mode: split on whitespace but keep whitespace tokens
+                        const regex = /(\s+|[^\s]+)/g;
+                        const tokens = src.match(regex) || [];
+                        for (const t of tokens) {
+                          if (ignoreWhitespace && /^\s+$/.test(t)) {
+                            norm.push(' ');
+                            map.push(t);
+                          } else {
+                            norm.push(t);
+                            map.push(t);
+                          }
+                        }
+                      }
+                      return { norm, map };
+                    };
+
+                    const A = buildNorm(a);
+                    const B = buildNorm(b);
+                    const n = A.norm.length;
+                    const m = B.norm.length;
+                    const dp: number[][] = Array.from({ length: n + 1 }, () => new Array<number>(m + 1).fill(0));
+                    for (let i = n - 1; i >= 0; i--) {
+                      for (let j = m - 1; j >= 0; j--) {
+                        dp[i][j] = A.norm[i] === B.norm[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+                      }
+                    }
+                    type Op = { type: 'eq' | 'del' | 'add'; piece: string };
+                    const ops: Op[] = [];
+                    let i = 0;
+                    let j = 0;
+                    while (i < n && j < m) {
+                      if (A.norm[i] === B.norm[j]) {
+                        ops.push({ type: 'eq', piece: A.map[i] });
+                        i++; j++;
+                      } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+                        ops.push({ type: 'del', piece: A.map[i] });
+                        i++;
+                      } else {
+                        ops.push({ type: 'add', piece: B.map[j] });
+                        j++;
+                      }
+                    }
+                    while (i < n) { ops.push({ type: 'del', piece: A.map[i++] }); }
+                    while (j < m) { ops.push({ type: 'add', piece: B.map[j++] }); }
+
+                    const segs: DiffSeg[] = [];
+                    let curType: Op['type'] | null = null;
+                    let buf = '';
+                    const flush = () => {
+                      if (curType === null || buf === '') return;
+                      if (curType === 'eq') segs.push({ text: buf, changed: false });
+                      else if (curType === 'del') segs.push({ text: buf, changed: true, diffType: 'del' });
+                      else segs.push({ text: buf, changed: true, diffType: 'add' });
+                      buf = '';
+                      curType = null;
+                    };
+                    for (const op0 of ops) {
+                      const op = ignoreWhitespace && op0.piece.trim() === '' ? { type: 'eq' as const, piece: op0.piece } : op0;
+                      if (curType === null) { curType = op.type; buf = op.piece; continue; }
+                      if (op.type === curType) buf += op.piece;
+                      else { flush(); curType = op.type; buf = op.piece; }
+                    }
+                    flush();
+                    return segs;
                   }
 
                   let lineNo = 1;
@@ -294,12 +452,7 @@ const DiffViewerTool: React.FC = () => {
                     if (line.startsWith('- ') && i + 1 < lines.length && lines[i + 1].startsWith('+ ')) {
                       const aRaw = line.slice(2);
                       const bRaw = lines[i + 1].slice(2);
-                      const [aSegs, bSegs] = splitInline(aRaw, bRaw);
-                      const merged: DiffSeg[] = [];
-                      if (aSegs[0].text) merged.push(aSegs[0]);
-                      if (aSegs[1].text) merged.push(aSegs[1]);
-                      if (bSegs[1].text) merged.push(bSegs[1]);
-                      if (aSegs[2].text) merged.push(aSegs[2]);
+                      const merged = mergedSegments(aRaw, bRaw, ignoreWs, charInline ? 'char' : 'word');
                       rows.push(renderLine(lineNo, '~', '', merged));
                       i++;
                       lineNo++;
