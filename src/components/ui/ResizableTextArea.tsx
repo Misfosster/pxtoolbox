@@ -65,7 +65,8 @@ const ResizableTextArea: React.FC<ResizableTextAreaProps> = ({ minRows = 3, styl
 				...style,
 				resize: resizable,
 				marginBottom: 0,
-				height: effectiveAutosize ? undefined : undefined,
+				// When autosize is disabled, respect an explicit height passed via style
+				height: effectiveAutosize ? undefined : (style && (style as React.CSSProperties).height !== undefined ? (style as React.CSSProperties).height : undefined),
 				overflow: effectiveAutosize && maxRows ? 'auto' : effectiveAutosize ? undefined : 'auto',
 			}}
 			onChange={(e) => {

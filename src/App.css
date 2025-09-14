@@ -103,7 +103,8 @@ textarea.bp5-input:focus:not(:focus-visible) {
 
 .main-container {
   padding: 20px;
-  max-width: 1200px;
+  /* allow tools to use entire width; keep a gentle max on ultra-wide */
+  max-width: 1600px;
   margin: 0 auto;
 }
 
