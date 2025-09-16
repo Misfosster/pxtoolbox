@@ -1,13 +1,47 @@
 export type DiffSeg = { text: string; changed: boolean; diffType?: 'add' | 'del' };
 
-const seg = typeof Intl !== 'undefined' && (Intl as any).Segmenter
+const graphemeSeg = typeof Intl !== 'undefined' && (Intl as any).Segmenter
 	? new (Intl as any).Segmenter(undefined, { granularity: 'grapheme' })
+	: null;
+const wordSeg = typeof Intl !== 'undefined' && (Intl as any).Segmenter
+	? new (Intl as any).Segmenter(undefined, { granularity: 'word' })
 	: null;
 
 const toGraphemes = (s: string): string[] => {
 	if (!s) return [];
-	return seg ? Array.from((seg as any).segment(s), (x: any) => x.segment) : Array.from(s);
+	return graphemeSeg ? Array.from((graphemeSeg as any).segment(s), (x: any) => x.segment) : Array.from(s);
 };
+
+function splitSubwords(token: string): string[] {
+	// Split camel/PascalCase boundaries, letter<->digit boundaries, and isolate '_' and '-'
+	if (!token) return [''];
+	if (/^\s+$/.test(token)) return [token];
+	const out: string[] = [];
+	let buf = '';
+	const flush = () => { if (buf) { out.push(buf); buf = ''; } };
+	for (let i = 0; i < token.length; i++) {
+		const ch = token[i];
+		const prev = i > 0 ? token[i - 1] : '';
+		if (ch === '_' || ch === '-') { flush(); out.push(ch); continue; }
+		const isUpper = ch >= 'A' && ch <= 'Z';
+		const isLower = ch >= 'a' && ch <= 'z';
+		const isLetter = isUpper || isLower;
+		const isDigit = ch >= '0' && ch <= '9';
+		const prevIsUpper = prev >= 'A' && prev <= 'Z';
+		const prevIsLower = prev >= 'a' && prev <= 'z';
+		const prevIsLetter = prevIsUpper || prevIsLower;
+		const prevIsDigit = prev >= '0' && prev <= '9';
+		if (
+			(i > 0 && prevIsLower && isUpper) ||
+			(i > 0 && ((prevIsLetter && isDigit) || (prevIsDigit && isLetter)))
+		) {
+			flush();
+		}
+		buf += ch;
+	}
+	flush();
+	return out;
+}
 
 function lcsIndices<T>(A: T[], B: T[], equals: (i: number, j: number) => boolean): Array<{ type: 'eq' | 'del' | 'add'; a?: T; b?: T; i?: number; j?: number }> {
 	const n = A.length, m = B.length;
@@ -29,39 +63,6 @@ function lcsIndices<T>(A: T[], B: T[], equals: (i: number, j: number) => boolean
 	return ops;
 }
 
-function levenshteinSimilarity(a: string, b: string): number {
-	if (a === b) return 1;
-	const n = a.length, m = b.length;
-	if (!n || !m) return 0;
-	const prev = new Array<number>(m + 1);
-	const curr = new Array<number>(m + 1);
-	for (let j = 0; j <= m; j++) prev[j] = j;
-	for (let i = 1; i <= n; i++) {
-		curr[0] = i;
-		const ai = a.charCodeAt(i - 1);
-		for (let j = 1; j <= m; j++) {
-			const cost = ai === b.charCodeAt(j - 1) ? 0 : 1;
-			const del = prev[j] + 1;
-			const ins = curr[j - 1] + 1;
-			const sub = prev[j - 1] + cost;
-			let v = del < ins ? del : ins; if (sub < v) v = sub;
-			curr[j] = v;
-		}
-		for (let j = 0; j <= m; j++) prev[j] = curr[j];
-	}
-	const dist = prev[m];
-	const ratio = 1 - dist / Math.max(n, m);
-	return ratio;
-}
-
-function tokensSimilar(aTok: string, bTok: string): boolean {
-	if (!aTok || !bTok) return false;
-	if (/^\s+$/.test(aTok) && /^\s+$/.test(bTok)) return true;
-	if (aTok === bTok) return true;
-	if (aTok.length <= 2 || bTok.length <= 2) return false;
-	return levenshteinSimilarity(aTok, bTok) >= 0.7;
-}
-
 export function mergedSegments(
 	a: string,
 	b: string,
@@ -69,43 +70,52 @@ export function mergedSegments(
 ): DiffSeg[] {
 	if (a === b) return [{ text: a, changed: false }];
 
-	// Tokenize with optional whitespace collapsing
+	// Tokenize with Unicode word segmentation, then heuristic subword splitting; preserve whitespace tokens
 	function buildTokens(src: string) {
-		if (ops.mode === 'char') {
-			const out: { norm: string[]; map: string[] } = { norm: [], map: [] };
-			let i = 0;
-			while (i < src.length) {
-				const ch = src[i];
-				if (ops.ignoreWhitespace && /\s/.test(ch)) {
-					let j = i + 1; while (j < src.length && /\s/.test(src[j])) j++;
-					out.norm.push(' ');
-					out.map.push(src.slice(i, j));
-					i = j;
-				} else {
-					out.norm.push(ch);
-					out.map.push(ch);
-					i++;
-				}
-			}
-			return out;
-		}
-		// word/smart
-		const parts = src.match(/(\s+|[^\s]+)/g) || [];
 		const norm: string[] = [];
 		const map: string[] = [];
+		if (ops.mode === 'char') {
+			const g = toGraphemes(src);
+			for (const ch of g) {
+				if (ops.ignoreWhitespace && /^\s+$/.test(ch)) { norm.push(' '); map.push(ch); }
+				else { norm.push(ch); map.push(ch); }
+			}
+			return { norm, map };
+		}
+		if (wordSeg) {
+			const iterator = (wordSeg as any).segment(src) as Iterable<any>;
+			for (const part of iterator as any) {
+				const segText: string = part.segment;
+				const isWordLike = !!part.isWordLike;
+				if (!isWordLike) {
+					if (ops.ignoreWhitespace && /^\s+$/.test(segText)) { norm.push(' '); map.push(segText); }
+					else { norm.push(segText); map.push(segText); }
+					continue;
+				}
+				for (const sub of splitSubwords(segText)) {
+					if (ops.ignoreWhitespace && /^\s+$/.test(sub)) { norm.push(' '); map.push(sub); }
+					else { norm.push(sub); map.push(sub); }
+				}
+			}
+			return { norm, map };
+		}
+		// Fallback: whitespace split then heuristic subword split
+		const parts = src.match(/(\s+|[^\s]+)/g) || [];
 		for (const t of parts) {
-			if (ops.ignoreWhitespace && /^\s+$/.test(t)) { norm.push(' '); map.push(t); }
-			else { norm.push(t); map.push(t); }
+			if (/^\s+$/.test(t)) {
+				if (ops.ignoreWhitespace) { norm.push(' '); map.push(t); } else { norm.push(t); map.push(t); }
+				continue;
+			}
+			for (const sub of splitSubwords(t)) { norm.push(sub); map.push(sub); }
 		}
 		return { norm, map };
 	}
 
 	const A = buildTokens(a);
 	const B = buildTokens(b);
-	const equals = (i: number, j: number) => A.norm[i] === B.norm[j]; // strict in all modes
+	const equals = (i: number, j: number) => A.norm[i] === B.norm[j]; // strict equality
 	const opsSeq = lcsIndices(A.norm, B.norm, equals);
 
-	// Post-pass: collapse adjacent del+add that are "similar" and refine with char diff
 	const segs: DiffSeg[] = [];
 	const MAX_CHAR_REFINEMENT = 2048; // graphemes
 	function charLevelSegments(x: string, y: string): DiffSeg[] {
@@ -142,10 +152,26 @@ export function mergedSegments(
 	for (let k = 0; k < opsSeq.length; k++) {
 		const cur = opsSeq[k];
 		const nxt = opsSeq[k + 1];
+		// Refine only when the pair is reasonably similar (avoid over-highlighting unrelated replacements)
 		if (
-			ops.mode === 'smart' && cur && nxt && cur.type === 'del' && nxt.type === 'add' &&
-			(cur.a as string).trim() !== '' && (nxt.b as string).trim() !== '' &&
-			tokensSimilar(cur.a as string, nxt.b as string)
+			cur && nxt && cur.type === 'del' && nxt.type === 'add' &&
+			!/^\s+$/.test(String(cur.a)) && !/^\s+$/.test(String(nxt.b)) &&
+			(
+				// heuristic similarity: quick length ratio + first/last grapheme match
+				(() => {
+					const aStr = String(cur.a);
+					const bStr = String(nxt.b);
+					const aLen = aStr.length || 1;
+					const bLen = bStr.length || 1;
+					const ratio = aLen > bLen ? bLen / aLen : aLen / bLen;
+					if (ratio < 0.34) return false;
+					const aG = toGraphemes(aStr);
+					const bG = toGraphemes(bStr);
+					if (aG.length && bG.length && aG[0] === bG[0]) return true;
+					if (aG.length && bG.length && aG[aG.length - 1] === bG[bG.length - 1]) return true;
+					return aStr.toLowerCase()[0] === bStr.toLowerCase()[0];
+				})()
+			)
 		) {
 			for (const seg of charLevelSegments(cur.a as string, nxt.b as string)) segs.push(seg);
 			k++; // consume the add

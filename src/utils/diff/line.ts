@@ -1,12 +1,21 @@
 import { normalizeWhitespaceLine } from './normalize';
 
+export function splitLinesNoTrailingEmpty(s: string): string[] {
+  // Split into lines and drop a trailing empty element if it's only from a terminal newline
+  const lines = s.split(/\n/);
+  if (lines.length > 0 && lines[lines.length - 1] === '' && /\n$/.test(s)) {
+    lines.pop();
+  }
+  return lines;
+}
+
 // Minimal LCS-based line diff. TODO: Replace with Myers for optimal scripts.
 export function lcsLineDiff(a: string, b: string, opts: { ignoreWhitespace: boolean }): string {
 	if (!a && !b) return '';
-	if (!a && b) return b.split(/\n/).map((l) => '+ ' + l).join('\n');
-	if (a && !b) return a.split(/\n/).map((l) => '- ' + l).join('\n');
-	const aLines = a.split(/\n/);
-	const bLines = b.split(/\n/);
+	if (!a && b) return splitLinesNoTrailingEmpty(b).map((l) => '+ ' + l).join('\n');
+	if (a && !b) return splitLinesNoTrailingEmpty(a).map((l) => '- ' + l).join('\n');
+	const aLines = splitLinesNoTrailingEmpty(a);
+	const bLines = splitLinesNoTrailingEmpty(b);
 	const aCmp = opts.ignoreWhitespace ? aLines.map(normalizeWhitespaceLine) : aLines;
 	const bCmp = opts.ignoreWhitespace ? bLines.map(normalizeWhitespaceLine) : bLines;
 	const n = aLines.length;
@@ -39,10 +48,8 @@ export function lcsLineDiff(a: string, b: string, opts: { ignoreWhitespace: bool
 
 export type AlignStep = { type: 'same' | 'del' | 'add' | 'mod'; i?: number; j?: number };
 
-// Produces an alignment of lines between a and b. Pairs adjacent del+add as 'mod'.
-export function alignLines(a: string, b: string, opts: { ignoreWhitespace: boolean }): AlignStep[] {
-	const aLines = a.split(/\n/);
-	const bLines = b.split(/\n/);
+// Produces an alignment of lines between pre-split arrays. Pairs adjacent del+add (or add+del) as 'mod'.
+export function alignLines(aLines: string[], bLines: string[], opts: { ignoreWhitespace: boolean }): AlignStep[] {
 	const aCmp = opts.ignoreWhitespace ? aLines.map(normalizeWhitespaceLine) : aLines;
 	const bCmp = opts.ignoreWhitespace ? bLines.map(normalizeWhitespaceLine) : bLines;
 	const n = aLines.length;
@@ -68,7 +75,14 @@ export function alignLines(a: string, b: string, opts: { ignoreWhitespace: boole
 		const cur = ops[k];
 		const nxt = ops[k + 1];
 		if (cur.type === 'eq') { out.push({ type: 'same', i: cur.i, j: cur.j }); continue; }
-		if (cur.type === 'del' && nxt && nxt.type === 'add') { out.push({ type: 'mod', i: cur.i, j: nxt.j }); k++; continue; }
+		// Pair single add+del or del+add as modification
+		if (nxt && ((cur.type === 'del' && nxt.type === 'add') || (cur.type === 'add' && nxt.type === 'del'))) {
+			const iIdx = cur.type === 'del' ? cur.i : nxt.i;
+			const jIdx = cur.type === 'add' ? cur.j : nxt.j;
+			out.push({ type: 'mod', i: iIdx, j: jIdx });
+			k++;
+			continue;
+		}
 		if (cur.type === 'del') { out.push({ type: 'del', i: cur.i }); continue; }
 		if (cur.type === 'add') { out.push({ type: 'add', j: cur.j }); continue; }
 	}

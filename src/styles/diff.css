@@ -1,0 +1,24 @@
+:root{
+  --diff-font: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --diff-fg-muted: rgba(191,204,214,.85);
+  --diff-add-bg: rgba(46,160,67,.10);
+  --diff-add-span: rgba(46,160,67,.55);
+  --diff-add-fg:#c0ffd0;
+  --diff-del-bg: rgba(248,81,73,.10);
+  --diff-del-span: rgba(248,81,73,.55);
+  --diff-del-fg:#ffd1cc;
+  --diff-mod-bg: rgba(100,148,237,.14);
+  --diff-gap: 8px;
+  --diff-gutter: 40px;
+  --diff-radius: 2px;
+  --diff-weight: 600;
+}
+
+.diff-line{ display:grid; grid-template-columns: var(--diff-gutter) 1fr; column-gap:var(--diff-gap); align-items:baseline; }
+.diff-line.add{ background:var(--diff-add-bg); color:var(--diff-fg-muted); }
+.diff-line.del{ background:var(--diff-del-bg); color:var(--diff-fg-muted); }
+.diff-line.mod{ background:var(--diff-mod-bg); color:var(--diff-fg-muted); }
+.diff-span.add{ background:var(--diff-add-span); color:var(--diff-add-fg); border-radius:var(--diff-radius); font-weight:var(--diff-weight); }
+.diff-span.del{ background:var(--diff-del-span); color:var(--diff-del-fg); border-radius:var(--diff-radius); font-weight:var(--diff-weight); }
+
+

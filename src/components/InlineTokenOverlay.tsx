@@ -19,6 +19,7 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({ segmentsPerLine
 	const lines = useMemo(() => segmentsPerLine, [segmentsPerLine]);
 	return (
 		<div
+			dir="auto"
 			aria-hidden
 			style={{
 				position: 'absolute',
@@ -26,7 +27,8 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({ segmentsPerLine
 				right: 0,
 				top: topOffsetPx - scrollTop,
 				pointerEvents: 'none',
-				fontFamily: fontFamily || 'inherit',
+				zIndex: 1,
+				fontFamily: fontFamily || 'var(--diff-font, inherit)',
 				fontSize: fontSize || 'inherit',
 				fontWeight: fontWeight || 'inherit',
 				letterSpacing: letterSpacing || 'normal',
@@ -39,13 +41,9 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({ segmentsPerLine
 				<React.Fragment key={idx}>
 					{segs.map((s, i) => {
 						const visible = s.changed && ((s.diffType === 'add' && showAdd) || (s.diffType === 'del' && showDel));
-						const style = visible
-							? (s.diffType === 'add'
-								? { background: 'rgba(46, 160, 67, 0.55)', borderRadius: 2 }
-								: { background: 'rgba(248, 81, 73, 0.55)', borderRadius: 2 })
-							: undefined;
+						const className = visible ? (s.diffType === 'add' ? 'diff-span add' : 'diff-span del') : undefined;
 						return (
-							<span key={i} style={style}>{s.text || ' '}</span>
+							<span key={i} className={className}>{s.text || ' '}</span>
 						);
 					})}
 					{idx < lines.length - 1 ? '\n' : null}

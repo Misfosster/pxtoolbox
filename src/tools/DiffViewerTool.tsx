@@ -1,11 +1,11 @@
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Switch } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
 import ResizableTextArea from '../components/ui/ResizableTextArea';
 import Field from '../components/ui/Field';
 import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
 import { normalizeEOL } from '../utils/diff/normalize';
-import { lcsLineDiff, alignLines } from '../utils/diff/line';
+import { lcsLineDiff } from '../utils/diff/line';
 import InlineTokenOverlay from '../components/InlineTokenOverlay';
 import { mergedSegments, type DiffSeg } from '../utils/diff/inline';
 import { useGutter } from '../hooks/useGutter';
@@ -36,62 +36,66 @@ const DiffViewerTool: React.FC = () => {
   const [rightScrollTop, setRightScrollTop] = useState<number>(0);
   const [leftHeight, setLeftHeight] = useState<number>(140);
   const [rightHeight, setRightHeight] = useState<number>(140);
+  // Debounced inputs to avoid thrashing
+  const [debLeft, setDebLeft] = useState<string>('');
+  const [debRight, setDebRight] = useState<string>('');
+  const [debIgnoreWs, setDebIgnoreWs] = useState<boolean>(ignoreWs);
+  const [debCharInline, setDebCharInline] = useState<boolean>(charInline);
+  useEffect(() => {
+    const id = setTimeout(() => setDebLeft(leftText), 120);
+    return () => clearTimeout(id);
+  }, [leftText]);
+  useEffect(() => {
+    const id = setTimeout(() => setDebRight(rightText), 120);
+    return () => clearTimeout(id);
+  }, [rightText]);
+  useEffect(() => {
+    const id = setTimeout(() => setDebIgnoreWs(ignoreWs), 120);
+    return () => clearTimeout(id);
+  }, [ignoreWs]);
+  useEffect(() => {
+    const id = setTimeout(() => setDebCharInline(charInline), 120);
+    return () => clearTimeout(id);
+  }, [charInline]);
+
   // Normalize EOLs before diffing
-  const leftNorm = useMemo(() => normalizeEOL(leftText), [leftText]);
-  const rightNorm = useMemo(() => normalizeEOL(rightText), [rightText]);
-  // legacy: wrapLines persisted key no longer used; always wrapping now
-  const diffText = useMemo(() => lcsLineDiff(leftNorm, rightNorm, { ignoreWhitespace: ignoreWs }), [leftNorm, rightNorm, ignoreWs]);
+  const leftNorm = useMemo(() => normalizeEOL(debLeft), [debLeft]);
+  const rightNorm = useMemo(() => normalizeEOL(debRight), [debRight]);
+
+  // Build unified diff text using old behavior (line-level LCS with pairing)
+  const diffText = useMemo(() => lcsLineDiff(leftNorm, rightNorm, { ignoreWhitespace: debIgnoreWs }), [leftNorm, rightNorm, debIgnoreWs]);
 
   // Build inline overlay segments per side using alignment
   const { leftOverlayLines, rightOverlayLines } = useMemo(() => {
-    const leftLines = leftNorm.split('\n');
-    const rightLines = rightNorm.split('\n');
-    const steps = alignLines(leftNorm, rightNorm, { ignoreWhitespace: ignoreWs });
+    const lines = diffText ? diffText.split('\n') : [];
     const leftArr: DiffSeg[][] = [];
     const rightArr: DiffSeg[][] = [];
-    for (const st of steps) {
-      if (st.type === 'same') {
-        const li = st.i as number; const rj = st.j as number;
-        leftArr.push([{ text: leftLines[li] ?? '', changed: false }]);
-        rightArr.push([{ text: rightLines[rj] ?? '', changed: false }]);
+    for (let i = 0; i < lines.length; i++) {
+      const cur = lines[i] || '';
+      const nxt = lines[i + 1] || '';
+      if (cur.startsWith('- ') && nxt.startsWith('+ ')) {
+        const aRaw = cur.slice(2);
+        const bRaw = nxt.slice(2);
+        const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: debIgnoreWs, mode: debCharInline ? 'char' : 'word' });
+        leftArr.push(segs.filter((s) => (s.changed ? s.diffType === 'del' : true)));
+        rightArr.push(segs.filter((s) => (s.changed ? s.diffType === 'add' : true)));
+        i++;
         continue;
       }
-      if (st.type === 'mod') {
-        const li = st.i as number; const rj = st.j as number;
-        const aLine = leftLines[li] ?? '';
-        const bLine = rightLines[rj] ?? '';
-        const merged = mergedSegments(aLine, bLine, { ignoreWhitespace: ignoreWs, mode: charInline ? 'char' : 'smart' });
-        const leftLine: DiffSeg[] = [];
-        const rightLine: DiffSeg[] = [];
-        for (const s of merged) {
-          if (s.diffType === 'add') {
-            // omit from left
-            rightLine.push({ text: s.text, changed: true, diffType: 'add' });
-          } else if (s.diffType === 'del') {
-            leftLine.push({ text: s.text, changed: true, diffType: 'del' });
-            // omit from right
-          } else {
-            leftLine.push({ text: s.text, changed: false });
-            rightLine.push({ text: s.text, changed: false });
-          }
-        }
-        leftArr.push(leftLine);
-        rightArr.push(rightLine);
+      if (cur.startsWith('- ')) {
+        leftArr.push([{ text: cur.slice(2), changed: true, diffType: 'del' }]);
         continue;
       }
-      if (st.type === 'del') {
-        const li = st.i as number;
-        leftArr.push([{ text: leftLines[li] ?? '', changed: true, diffType: 'del' }]);
+      if (cur.startsWith('+ ')) {
+        rightArr.push([{ text: cur.slice(2), changed: true, diffType: 'add' }]);
         continue;
       }
-      if (st.type === 'add') {
-        const rj = st.j as number;
-        rightArr.push([{ text: rightLines[rj] ?? '', changed: true, diffType: 'add' }]);
-        continue;
-      }
+      const sameText = cur.startsWith('  ') ? cur.slice(2) : cur;
+      leftArr.push([{ text: sameText, changed: false }]);
+      rightArr.push([{ text: sameText, changed: false }]);
     }
     return { leftOverlayLines: leftArr, rightOverlayLines: rightArr };
-  }, [leftNorm, rightNorm, ignoreWs, charInline]);
+  }, [diffText, debIgnoreWs, debCharInline]);
 
   return (
     <ToolShell
@@ -139,19 +143,21 @@ const DiffViewerTool: React.FC = () => {
                   }}
                   inputRef={(el) => (leftRef.current = el)}
                 />
-                <InlineTokenOverlay
-                  segmentsPerLine={leftOverlayLines}
-                  leftOffsetPx={GUTTER_WIDTH_PX + CONTENT_GAP_PX}
-                  topOffsetPx={leftMetrics.paddingTop}
-                  scrollTop={leftScrollTop}
-                  fontFamily={leftMetrics.fontFamily}
-                  fontSize={leftMetrics.fontSize}
-                  fontWeight={leftMetrics.fontWeight}
-                  letterSpacing={leftMetrics.letterSpacing}
-                  lineHeightPx={leftMetrics.lineHeight}
-                  showAdd={!alteredOnly}
-                  showDel={true}
-                />
+                {!alteredOnly && (
+                  <InlineTokenOverlay
+                    segmentsPerLine={leftOverlayLines}
+                    leftOffsetPx={GUTTER_WIDTH_PX + CONTENT_GAP_PX}
+                    topOffsetPx={leftMetrics.paddingTop}
+                    scrollTop={leftScrollTop}
+                    fontFamily={leftMetrics.fontFamily}
+                    fontSize={leftMetrics.fontSize}
+                    fontWeight={leftMetrics.fontWeight}
+                    letterSpacing={leftMetrics.letterSpacing}
+                    lineHeightPx={leftMetrics.lineHeight}
+                    showAdd={false}
+                    showDel={true}
+                  />
+                )}
                 <div
                   aria-hidden
                   style={{
@@ -355,7 +361,7 @@ const DiffViewerTool: React.FC = () => {
                   overflowY: 'auto',
                   overflowX: 'hidden',
                   resize: 'both',
-                  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+                  fontFamily: 'var(--diff-font, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace)',
                   whiteSpace: 'pre-wrap',
                   border: '1px solid rgba(138,155,168,0.15)',
                   borderRadius: 3,
@@ -364,9 +370,9 @@ const DiffViewerTool: React.FC = () => {
                 }}
               >
                 {(() => {
-                  const lines = diffText.split('\n');
+                  const lines = diffText ? diffText.split('\n') : [];
                   const rows: React.ReactNode[] = [];
-                  const muted = 'rgba(191, 204, 214, 0.85)';
+                  const muted = 'var(--diff-fg-muted, rgba(191, 204, 214, 0.85))';
 
                   type LocalSeg = { text: string; changed: boolean; diffType?: 'add' | 'del' };
 
@@ -375,26 +381,16 @@ const DiffViewerTool: React.FC = () => {
                     const isDel = marker === '-';
                     const isMod = marker === '~';
                     const bg = isAdd
-                      ? 'rgba(46, 160, 67, 0.10)'
+                      ? 'var(--diff-add-bg)'
                       : isDel
-                      ? 'rgba(248, 81, 73, 0.10)'
+                      ? 'var(--diff-del-bg)'
                       : isMod
-                      ? 'rgba(100, 148, 237, 0.14)'
+                      ? 'var(--diff-mod-bg)'
                       : 'transparent';
                     const fg = isAdd ? '#7ee787' : isDel ? '#ffa198' : muted;
+                    const cls = isAdd ? 'diff-line add' : isDel ? 'diff-line del' : isMod ? 'diff-line mod' : 'diff-line';
                     return (
-                      <div
-                        key={`l-${displayNum}-${marker}`}
-                        style={{
-                          display: 'grid',
-                          gridTemplateColumns: `${GUTTER_WIDTH_PX}px 1fr`,
-                          columnGap: CONTENT_GAP_PX,
-                          alignItems: 'baseline',
-                          padding: '0 6px 0 0',
-                          background: bg,
-                          color: fg,
-                        }}
-                      >
+                      <div key={`l-${displayNum}-${marker}`} className={cls} style={{ padding: '0 6px 0 0', color: fg, background: bg }}>
                         <span style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline', gap: 6, color: 'rgba(138,155,168,0.7)', userSelect: 'none' }}>
                           <span style={{ width: 14, textAlign: 'center' }}>{marker !== ' ' ? marker : ''}</span>
                           <span>{displayNum}</span>
@@ -402,17 +398,7 @@ const DiffViewerTool: React.FC = () => {
                         <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere', minWidth: 0 }}>
                           {segments
                             ? segments.map((s, i) => (
-                                <span
-                                  key={i}
-                                  style={
-                                    s.changed
-                                      ? (s.diffType === 'add'
-                                          ? { background: 'rgba(46, 160, 67, 0.55)', color: '#c0ffd0', borderRadius: 2, fontWeight: 600 }
-                                          : { background: 'rgba(248, 81, 73, 0.55)', color: '#ffd1cc', borderRadius: 2, fontWeight: 600 }
-                                        )
-                                      : undefined
-                                  }
-                                >
+                                <span key={i} className={s.changed ? (s.diffType === 'add' ? 'diff-span add' : 'diff-span del') : undefined}>
                                   {s.text || ' '}
                                 </span>
                               ))
@@ -422,18 +408,16 @@ const DiffViewerTool: React.FC = () => {
                     );
                   }
 
-                  // use imported mergedSegments for inline preview on modified lines
-
-                  let lineNo = 1;
+                  let display = 1;
                   for (let i = 0; i < lines.length; i++) {
                     const line = lines[i] || '';
-                    if (line.startsWith('- ') && i + 1 < lines.length && lines[i + 1].startsWith('+ ')) {
+                    if (line.startsWith('- ') && lines[i + 1]?.startsWith('+ ')) {
                       const aRaw = line.slice(2);
                       const bRaw = lines[i + 1].slice(2);
-                      const merged = mergedSegments(aRaw, bRaw, { ignoreWhitespace: ignoreWs, mode: charInline ? 'char' : 'smart' }) as unknown as LocalSeg[];
-                      rows.push(renderLine(lineNo, '~', '', merged));
+                      const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: debIgnoreWs, mode: debCharInline ? 'char' : 'word' }) as unknown as LocalSeg[];
+                      rows.push(renderLine(display, '~', '', segs));
                       i++;
-                      lineNo++;
+                      display++;
                       continue;
                     }
                     const marker: '+' | '-' | ' ' = line.startsWith('+ ')
@@ -441,8 +425,8 @@ const DiffViewerTool: React.FC = () => {
                       : line.startsWith('- ')
                       ? '-'
                       : ' ';
-                    rows.push(renderLine(lineNo, marker, marker === ' ' ? line.slice(2) : line.slice(2)));
-                    lineNo++;
+                    rows.push(renderLine(display, marker, line.slice(2)));
+                    display++;
                   }
                   return rows;
                 })()}
