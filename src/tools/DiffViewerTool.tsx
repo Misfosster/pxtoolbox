@@ -5,7 +5,7 @@ import ResizableTextArea from '../components/ui/ResizableTextArea';
 import Field from '../components/ui/Field';
 import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
 import { normalizeEOL } from '../utils/diff/normalize';
-import { lcsLineDiff } from '../utils/diff/line';
+import { alignLines, splitLinesNoTrailingEmpty } from '../utils/diff/line';
 import InlineTokenOverlay from '../components/InlineTokenOverlay';
 import { mergedSegments, type DiffSeg } from '../utils/diff/inline';
 import { useGutter } from '../hooks/useGutter';
@@ -58,44 +58,58 @@ const DiffViewerTool: React.FC = () => {
     return () => clearTimeout(id);
   }, [charInline]);
 
-  // Normalize EOLs before diffing
+  // Normalize EOLs (debounced for heavy diff)
   const leftNorm = useMemo(() => normalizeEOL(debLeft), [debLeft]);
   const rightNorm = useMemo(() => normalizeEOL(debRight), [debRight]);
+  // Normalize EOLs (immediate) previously used for overlay; retained approach removed to keep one source of truth
 
-  // Build unified diff text using old behavior (line-level LCS with pairing)
-  const diffText = useMemo(() => lcsLineDiff(leftNorm, rightNorm, { ignoreWhitespace: debIgnoreWs }), [leftNorm, rightNorm, debIgnoreWs]);
+  // Build index-preserving alignment steps used for preview (debounced)
+  const { steps, leftLines, rightLines } = useMemo(() => {
+    const a = splitLinesNoTrailingEmpty(leftNorm);
+    const b = splitLinesNoTrailingEmpty(rightNorm);
+    const s = alignLines(a, b, { ignoreWhitespace: debIgnoreWs });
+    return { steps: s, leftLines: a, rightLines: b };
+  }, [leftNorm, rightNorm, debIgnoreWs]);
 
-  // Build inline overlay segments per side using alignment
+  // Note: overlays use the same steps as preview to keep a single source of truth.
+
+  // Build inline overlay segments per side from the SAME alignment steps (single source of truth)
   const { leftOverlayLines, rightOverlayLines } = useMemo(() => {
-    const lines = diffText ? diffText.split('\n') : [];
     const leftArr: DiffSeg[][] = [];
     const rightArr: DiffSeg[][] = [];
-    for (let i = 0; i < lines.length; i++) {
-      const cur = lines[i] || '';
-      const nxt = lines[i + 1] || '';
-      if (cur.startsWith('- ') && nxt.startsWith('+ ')) {
-        const aRaw = cur.slice(2);
-        const bRaw = nxt.slice(2);
+    for (const st of steps) {
+      if (st.type === 'same') {
+        const t = leftLines[st.i as number] || '';
+        const seg: DiffSeg = { text: t, changed: false };
+        leftArr.push([seg]);
+        rightArr.push([seg]);
+        continue;
+      }
+      if (st.type === 'del') {
+        const t = leftLines[st.i as number] || '';
+        leftArr.push([{ text: t, changed: true, diffType: 'del' }]);
+        // Keep right array aligned by pushing an unchanged empty placeholder
+        rightArr.push([{ text: '', changed: false }]);
+        continue;
+      }
+      if (st.type === 'add') {
+        const t = rightLines[st.j as number] || '';
+        // Keep left array aligned by pushing an unchanged empty placeholder
+        leftArr.push([{ text: '', changed: false }]);
+        rightArr.push([{ text: t, changed: true, diffType: 'add' }]);
+        continue;
+      }
+      if (st.type === 'mod') {
+        const aRaw = leftLines[st.i as number] || '';
+        const bRaw = rightLines[st.j as number] || '';
         const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: debIgnoreWs, mode: debCharInline ? 'char' : 'word' });
-        leftArr.push(segs.filter((s) => (s.changed ? s.diffType === 'del' : true)));
-        rightArr.push(segs.filter((s) => (s.changed ? s.diffType === 'add' : true)));
-        i++;
-        continue;
+        // Both sides receive all segments; overlay hides non-relevant kinds via props
+        leftArr.push(segs);
+        rightArr.push(segs);
       }
-      if (cur.startsWith('- ')) {
-        leftArr.push([{ text: cur.slice(2), changed: true, diffType: 'del' }]);
-        continue;
-      }
-      if (cur.startsWith('+ ')) {
-        rightArr.push([{ text: cur.slice(2), changed: true, diffType: 'add' }]);
-        continue;
-      }
-      const sameText = cur.startsWith('  ') ? cur.slice(2) : cur;
-      leftArr.push([{ text: sameText, changed: false }]);
-      rightArr.push([{ text: sameText, changed: false }]);
     }
     return { leftOverlayLines: leftArr, rightOverlayLines: rightArr };
-  }, [diffText, debIgnoreWs, debCharInline]);
+  }, [steps, leftLines, rightLines, debIgnoreWs, debCharInline]);
 
   return (
     <ToolShell
@@ -149,6 +163,7 @@ const DiffViewerTool: React.FC = () => {
                     leftOffsetPx={GUTTER_WIDTH_PX + CONTENT_GAP_PX}
                     topOffsetPx={leftMetrics.paddingTop}
                     scrollTop={leftScrollTop}
+                    contentWidthPx={(leftRef.current ? (leftRef.current.clientWidth - parseFloat(getComputedStyle(leftRef.current).paddingLeft || '0') - parseFloat(getComputedStyle(leftRef.current).paddingRight || '0')) : undefined) as any}
                     fontFamily={leftMetrics.fontFamily}
                     fontSize={leftMetrics.fontSize}
                     fontWeight={leftMetrics.fontWeight}
@@ -264,6 +279,7 @@ const DiffViewerTool: React.FC = () => {
                   leftOffsetPx={GUTTER_WIDTH_PX + CONTENT_GAP_PX}
                   topOffsetPx={rightMetrics.paddingTop}
                   scrollTop={rightScrollTop}
+                  contentWidthPx={(rightRef.current ? (rightRef.current.clientWidth - parseFloat(getComputedStyle(rightRef.current).paddingLeft || '0') - parseFloat(getComputedStyle(rightRef.current).paddingRight || '0')) : undefined) as any}
                   fontFamily={rightMetrics.fontFamily}
                   fontSize={rightMetrics.fontSize}
                   fontWeight={rightMetrics.fontWeight}
@@ -370,7 +386,6 @@ const DiffViewerTool: React.FC = () => {
                 }}
               >
                 {(() => {
-                  const lines = diffText ? diffText.split('\n') : [];
                   const rows: React.ReactNode[] = [];
                   const muted = 'var(--diff-fg-muted, rgba(191, 204, 214, 0.85))';
 
@@ -390,7 +405,14 @@ const DiffViewerTool: React.FC = () => {
                     const fg = isAdd ? '#7ee787' : isDel ? '#ffa198' : muted;
                     const cls = isAdd ? 'diff-line add' : isDel ? 'diff-line del' : isMod ? 'diff-line mod' : 'diff-line';
                     return (
-                      <div key={`l-${displayNum}-${marker}`} className={cls} style={{ padding: '0 6px 0 0', color: fg, background: bg }}>
+                      <div
+                        key={`l-${displayNum}-${marker}`}
+                        data-preview-line
+                        data-marker={marker}
+                        data-display-index={displayNum}
+                        className={cls}
+                        style={{ padding: '0 6px 0 0', color: fg, background: bg }}
+                      >
                         <span style={{ display: 'flex', justifyContent: 'flex-start', alignItems: 'baseline', gap: 6, color: 'rgba(138,155,168,0.7)', userSelect: 'none' }}>
                           <span style={{ width: 14, textAlign: 'center' }}>{marker !== ' ' ? marker : ''}</span>
                           <span>{displayNum}</span>
@@ -408,25 +430,28 @@ const DiffViewerTool: React.FC = () => {
                     );
                   }
 
-                  let display = 1;
-                  for (let i = 0; i < lines.length; i++) {
-                    const line = lines[i] || '';
-                    if (line.startsWith('- ') && lines[i + 1]?.startsWith('+ ')) {
-                      const aRaw = line.slice(2);
-                      const bRaw = lines[i + 1].slice(2);
-                      const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: debIgnoreWs, mode: debCharInline ? 'char' : 'word' }) as unknown as LocalSeg[];
-                      rows.push(renderLine(display, '~', '', segs));
-                      i++;
-                      display++;
+                  for (const st of steps) {
+                    if (st.type === 'same') {
+                      const t = leftLines[st.i as number] || '';
+                      rows.push(renderLine((st.i as number) + 1, ' ', t));
                       continue;
                     }
-                    const marker: '+' | '-' | ' ' = line.startsWith('+ ')
-                      ? '+'
-                      : line.startsWith('- ')
-                      ? '-'
-                      : ' ';
-                    rows.push(renderLine(display, marker, line.slice(2)));
-                    display++;
+                    if (st.type === 'del') {
+                      const t = leftLines[st.i as number] || '';
+                      rows.push(renderLine((st.i as number) + 1, '-', t));
+                      continue;
+                    }
+                    if (st.type === 'add') {
+                      const t = rightLines[st.j as number] || '';
+                      rows.push(renderLine((st.j as number) + 1, '+', t));
+                      continue;
+                    }
+                    if (st.type === 'mod') {
+                      const aRaw = leftLines[st.i as number] || '';
+                      const bRaw = rightLines[st.j as number] || '';
+                      const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: debIgnoreWs, mode: debCharInline ? 'char' : 'word' }) as unknown as LocalSeg[];
+                      rows.push(renderLine((st.i as number) + 1, '~', '', segs));
+                    }
                   }
                   return rows;
                 })()}

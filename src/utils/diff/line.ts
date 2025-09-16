@@ -48,7 +48,8 @@ export function lcsLineDiff(a: string, b: string, opts: { ignoreWhitespace: bool
 
 export type AlignStep = { type: 'same' | 'del' | 'add' | 'mod'; i?: number; j?: number };
 
-// Produces an alignment of lines between pre-split arrays. Pairs adjacent del+add (or add+del) as 'mod'.
+// Produces an index-preserving alignment of lines between pre-split arrays.
+// Uses LCS with normalization-aware tie-breakers. Does NOT pair add/del by loose adjacency.
 export function alignLines(aLines: string[], bLines: string[], opts: { ignoreWhitespace: boolean }): AlignStep[] {
 	const aCmp = opts.ignoreWhitespace ? aLines.map(normalizeWhitespaceLine) : aLines;
 	const bCmp = opts.ignoreWhitespace ? bLines.map(normalizeWhitespaceLine) : bLines;
@@ -60,32 +61,32 @@ export function alignLines(aLines: string[], bLines: string[], opts: { ignoreWhi
 			dp[i][j] = aCmp[i] === bCmp[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
 		}
 	}
-	const ops: Array<{ type: 'eq' | 'del' | 'add'; i?: number; j?: number }> = [];
-	let i = 0, j = 0;
-	while (i < n && j < m) {
-		if (aCmp[i] === bCmp[j]) { ops.push({ type: 'eq', i, j }); i++; j++; continue; }
-		if (dp[i + 1][j] >= dp[i][j + 1]) { ops.push({ type: 'del', i }); i++; }
-		else { ops.push({ type: 'add', j }); j++; }
-	}
-	while (i < n) { ops.push({ type: 'del', i }); i++; }
-	while (j < m) { ops.push({ type: 'add', j }); j++; }
 
 	const out: AlignStep[] = [];
-	for (let k = 0; k < ops.length; k++) {
-		const cur = ops[k];
-		const nxt = ops[k + 1];
-		if (cur.type === 'eq') { out.push({ type: 'same', i: cur.i, j: cur.j }); continue; }
-		// Pair single add+del or del+add as modification
-		if (nxt && ((cur.type === 'del' && nxt.type === 'add') || (cur.type === 'add' && nxt.type === 'del'))) {
-			const iIdx = cur.type === 'del' ? cur.i : nxt.i;
-			const jIdx = cur.type === 'add' ? cur.j : nxt.j;
-			out.push({ type: 'mod', i: iIdx, j: jIdx });
-			k++;
-			continue;
-		}
-		if (cur.type === 'del') { out.push({ type: 'del', i: cur.i }); continue; }
-		if (cur.type === 'add') { out.push({ type: 'add', j: cur.j }); continue; }
+	let i = 0, j = 0;
+	while (i < n && j < m) {
+		if (aCmp[i] === bCmp[j]) { out.push({ type: 'same', i, j }); i++; j++; continue; }
+
+		// Normalization-aware tie-breakers (prefer operations that keep immediate alignment)
+		const delKeeps = i + 1 < n && aCmp[i + 1] === bCmp[j];
+		const addKeeps = j + 1 < m && aCmp[i] === bCmp[j + 1];
+		if (delKeeps && !addKeeps) { out.push({ type: 'del', i }); i++; continue; }
+		if (addKeeps && !delKeeps) { out.push({ type: 'add', j }); j++; continue; }
+
+		// Prefer pairing as a modification when LCS choices tie, to maintain 1:1 alignment across runs
+		if (dp[i + 1][j] === dp[i][j + 1]) { out.push({ type: 'mod', i, j }); i++; j++; continue; }
+
+		// Fall back to dp preference
+		if (dp[i + 1][j] > dp[i][j + 1]) { out.push({ type: 'del', i }); i++; continue; }
+		if (dp[i + 1][j] < dp[i][j + 1]) { out.push({ type: 'add', j }); j++; continue; }
+
+		// Tie: emit both sides as independent ops but preserve indices progression deterministically
+		out.push({ type: 'del', i });
+		out.push({ type: 'add', j });
+		i++; j++;
 	}
+	while (i < n) { out.push({ type: 'del', i }); i++; }
+	while (j < m) { out.push({ type: 'add', j }); j++; }
 	return out;
 }
 
