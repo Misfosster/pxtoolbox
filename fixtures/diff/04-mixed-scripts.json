@@ -1,0 +1,15 @@
+{
+  "name": "Mixed writing systems",
+  "description": "Tests handling of different scripts and RTL text",
+  "left": "English text here\n中文测试文本\nالنص العربي\nрусский текст\n日本語のテスト",
+  "right": "English text modified\n中文测试内容\nالنص العربي المعدل\nрусский текст изменен\n日本語の変更",
+  "expectedSteps": [
+    {"type": "mod", "leftNum": 1, "rightNum": 1},
+    {"type": "mod", "leftNum": 2, "rightNum": 2},
+    {"type": "mod", "leftNum": 3, "rightNum": 3},
+    {"type": "mod", "leftNum": 4, "rightNum": 4},
+    {"type": "mod", "leftNum": 5, "rightNum": 5}
+  ],
+  "expectedStats": {"deleted": 0, "added": 0, "modified": 5, "unchanged": 0},
+  "scripts": ["Latin", "Chinese", "Arabic", "Cyrillic", "Japanese"]
+}

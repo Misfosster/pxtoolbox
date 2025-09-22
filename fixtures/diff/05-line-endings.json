@@ -1,0 +1,28 @@
+{
+  "name": "Line ending normalization", 
+  "description": "Tests CRLF vs LF handling with ignoreEOL toggle",
+  "left": "line1\\r\\nline2\\r\\nline3\\r\\n",
+  "right": "line1\\nline2\\nline3\\n",
+  "expectedSteps": [
+    {"type": "mod", "leftNum": 1, "rightNum": 1},
+    {"type": "mod", "leftNum": 2, "rightNum": 2}, 
+    {"type": "mod", "leftNum": 3, "rightNum": 3}
+  ],
+  "expectedStats": {"deleted": 0, "added": 0, "modified": 3, "unchanged": 0},
+  "withIgnoreEOL": {
+    "expectedSteps": [
+      {"type": "same", "leftNum": 1, "rightNum": 1},
+      {"type": "same", "leftNum": 2, "rightNum": 2},
+      {"type": "same", "leftNum": 3, "rightNum": 3}
+    ],
+    "expectedStats": {"deleted": 0, "added": 0, "modified": 0, "unchanged": 3}
+  },
+  "withoutIgnoreEOL": {
+    "expectedSteps": [
+      {"type": "mod", "leftNum": 1, "rightNum": 1},
+      {"type": "mod", "leftNum": 2, "rightNum": 2}, 
+      {"type": "mod", "leftNum": 3, "rightNum": 3}
+    ],
+    "expectedStats": {"deleted": 0, "added": 0, "modified": 3, "unchanged": 0}
+  }
+}

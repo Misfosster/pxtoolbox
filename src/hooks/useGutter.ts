@@ -33,7 +33,9 @@ export function useGutter(text: string, textarea: HTMLTextAreaElement | null) {
 		mirror.style.border = '0';
 		mirror.style.width = `${contentWidth}px`;
 		mirror.style.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+		mirror.style.lineHeight = cs.lineHeight || `${lineHeight}px`;
 		mirror.style.letterSpacing = cs.letterSpacing || 'normal';
+		(mirror.style as any).tabSize = (el.style as any).tabSize || '4';
 		document.body.appendChild(mirror);
 		const gutterLines: string[] = [];
 		const logical = text0.split('\n');

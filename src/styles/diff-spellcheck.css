@@ -1,0 +1,31 @@
+/**
+ * Disable spellchecker underlines that distract in diff views
+ */
+
+/* Disable wavy underlines in WebKit browsers */
+textarea[spellcheck="false"]::-webkit-grammar-error,
+textarea[spellcheck="false"]::-webkit-spelling-error {
+  text-decoration: none;
+}
+
+/* Disable spellcheck in Firefox */
+textarea[spellcheck="false"] {
+  -moz-spellcheck: false;
+}
+
+/* Safety override for overlay segments to prevent any text decoration */
+.diff-seg {
+  text-decoration: none !important;
+}
+
+/* Ensure overlay containers don't inherit unwanted decorations */
+[data-testid="overlay-left"],
+[data-testid="overlay-right"] {
+  text-decoration: none;
+}
+
+/* Additional safety for inline token overlays */
+.diff-seg span,
+.diff-seg * {
+  text-decoration: none !important;
+}

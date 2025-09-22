@@ -1,0 +1,17 @@
+{
+  "name": "N≠M replace hunk (cross-line bleeding bug)",
+  "description": "Multiple left lines vs multiple right lines - should not bleed tokens across lines",
+  "left": "function test() {\n  return \"old\";\n}",
+  "right": "function test() { return \"new\"; }",
+  "expectedSteps": [
+    {"type": "del", "leftNum": 1, "rightNum": 0},
+    {"type": "del", "leftNum": 2, "rightNum": 0},
+    {"type": "del", "leftNum": 3, "rightNum": 0},
+    {"type": "add", "leftNum": 0, "rightNum": 1}
+  ],
+  "expectedStats": {"deleted": 3, "added": 1, "modified": 0, "unchanged": 0},
+  "antiPatterns": {
+    "noIntralineBleed": "Tokens from line 2 should not appear highlighted on line 1",
+    "correctNumbering": "Each line should maintain its original line number"
+  }
+}

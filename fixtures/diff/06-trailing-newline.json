@@ -1,0 +1,17 @@
+{
+  "name": "Trailing newline differences",
+  "description": "Tests EOF badge display when trailing newlines differ",
+  "left": "line 1\nline 2\nline 3",
+  "right": "line 1\nline 2\nline 3\n",
+  "expectedSteps": [
+    {"type": "same", "leftNum": 1, "rightNum": 1},
+    {"type": "same", "leftNum": 2, "rightNum": 2},
+    {"type": "same", "leftNum": 3, "rightNum": 3}
+  ],
+  "expectedStats": {"deleted": 0, "added": 0, "modified": 0, "unchanged": 3},
+  "eofBadge": {
+    "shouldShow": true,
+    "side": "left",
+    "message": "\\ No newline at end of file"
+  }
+}

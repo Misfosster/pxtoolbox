@@ -1,0 +1,16 @@
+{
+  "name": "Bazaz overlay duplication bug",
+  "description": "Specific case that caused token duplication in overlays",
+  "left": "foo\nbar\nbazaz",
+  "right": "foo\nbar\nbaz",
+  "expectedSteps": [
+    {"type": "same", "leftNum": 1, "rightNum": 1},
+    {"type": "same", "leftNum": 2, "rightNum": 2},
+    {"type": "mod", "leftNum": 3, "rightNum": 3}
+  ],
+  "expectedStats": {"deleted": 0, "added": 0, "modified": 1, "unchanged": 2},
+  "inlineExpected": {
+    "left": [{"text": "az", "type": "del"}],
+    "right": [{"text": "baz", "type": "same"}]
+  }
+}

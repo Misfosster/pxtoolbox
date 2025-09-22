@@ -1,0 +1,14 @@
+{
+  "name": "Foo line deletion",
+  "description": "Single line deletion in middle of text - tests numbering alignment",
+  "left": "line 1\nline 2\nfoo line to delete\nline 4\nline 5",
+  "right": "line 1\nline 2\nline 4\nline 5", 
+  "expectedSteps": [
+    {"type": "same", "leftNum": 1, "rightNum": 1},
+    {"type": "same", "leftNum": 2, "rightNum": 2}, 
+    {"type": "del", "leftNum": 3, "rightNum": 0},
+    {"type": "same", "leftNum": 4, "rightNum": 3},
+    {"type": "same", "leftNum": 5, "rightNum": 4}
+  ],
+  "expectedStats": {"deleted": 1, "added": 0, "modified": 0, "unchanged": 4}
+}

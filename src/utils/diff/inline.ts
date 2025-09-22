@@ -1,15 +1,17 @@
 export type DiffSeg = { text: string; changed: boolean; diffType?: 'add' | 'del' };
 
-const graphemeSeg = typeof Intl !== 'undefined' && (Intl as any).Segmenter
-	? new (Intl as any).Segmenter(undefined, { granularity: 'grapheme' })
-	: null;
+import { compareKey } from './unicode';
+import { splitGraphemes } from '../text/graphemes';
+
+// Removed: using graphemesNFC from unicode.ts instead
 const wordSeg = typeof Intl !== 'undefined' && (Intl as any).Segmenter
 	? new (Intl as any).Segmenter(undefined, { granularity: 'word' })
 	: null;
 
 const toGraphemes = (s: string): string[] => {
 	if (!s) return [];
-	return graphemeSeg ? Array.from((graphemeSeg as any).segment(s), (x: any) => x.segment) : Array.from(s);
+	// Use dedicated grapheme splitter that handles ZWJ sequences and composed accents
+	return splitGraphemes(s.normalize('NFC'));
 };
 
 function splitSubwords(token: string): string[] {
@@ -69,16 +71,30 @@ export function mergedSegments(
 	ops: { ignoreWhitespace: boolean; mode: 'char' | 'word' | 'smart' }
 ): DiffSeg[] {
 	if (a === b) return [{ text: a, changed: false }];
+	
+	// Normalize for comparison only, keep originals for rendering
+	const aN = a.normalize('NFC');
+	const bN = b.normalize('NFC');
 
 	// Tokenize with Unicode word segmentation, then heuristic subword splitting; preserve whitespace tokens
-	function buildTokens(src: string) {
+	// Use consistent Unicode normalization via compareKey
+	function buildTokens(src: string, original: string) {
 		const norm: string[] = [];
 		const map: string[] = [];
 		if (ops.mode === 'char') {
+			// Tokenize normalized string but map back to original positions
 			const g = toGraphemes(src);
-			for (const ch of g) {
-				if (ops.ignoreWhitespace && /^\s+$/.test(ch)) { norm.push(' '); map.push(ch); }
-				else { norm.push(ch); map.push(ch); }
+			const originalGraphemes = toGraphemes(original);
+			for (let idx = 0; idx < g.length && idx < originalGraphemes.length; idx++) {
+				const ch = g[idx];
+				const originalCh = originalGraphemes[idx];
+				if (ops.ignoreWhitespace && /^\s+$/.test(ch)) { 
+					norm.push(compareKey(' ', { ignoreWhitespace: true })); 
+					map.push(originalCh); 
+				} else { 
+					norm.push(compareKey(ch, { ignoreWhitespace: ops.ignoreWhitespace })); 
+					map.push(originalCh); 
+				}
 			}
 			return { norm, map };
 		}
@@ -88,13 +104,23 @@ export function mergedSegments(
 				const segText: string = part.segment;
 				const isWordLike = !!part.isWordLike;
 				if (!isWordLike) {
-					if (ops.ignoreWhitespace && /^\s+$/.test(segText)) { norm.push(' '); map.push(segText); }
-					else { norm.push(segText); map.push(segText); }
+					if (ops.ignoreWhitespace && /^\s+$/.test(segText)) { 
+						norm.push(compareKey(' ', { ignoreWhitespace: true })); 
+						map.push(segText); 
+					} else { 
+						norm.push(compareKey(segText, { ignoreWhitespace: ops.ignoreWhitespace })); 
+						map.push(segText); 
+					}
 					continue;
 				}
 				for (const sub of splitSubwords(segText)) {
-					if (ops.ignoreWhitespace && /^\s+$/.test(sub)) { norm.push(' '); map.push(sub); }
-					else { norm.push(sub); map.push(sub); }
+					if (ops.ignoreWhitespace && /^\s+$/.test(sub)) { 
+						norm.push(compareKey(' ', { ignoreWhitespace: true })); 
+						map.push(sub); 
+					} else { 
+						norm.push(compareKey(sub, { ignoreWhitespace: ops.ignoreWhitespace })); 
+						map.push(sub); 
+					}
 				}
 			}
 			return { norm, map };
@@ -103,17 +129,26 @@ export function mergedSegments(
 		const parts = src.match(/(\s+|[^\s]+)/g) || [];
 		for (const t of parts) {
 			if (/^\s+$/.test(t)) {
-				if (ops.ignoreWhitespace) { norm.push(' '); map.push(t); } else { norm.push(t); map.push(t); }
+				if (ops.ignoreWhitespace) { 
+					norm.push(compareKey(' ', { ignoreWhitespace: true })); 
+					map.push(t); 
+				} else { 
+					norm.push(compareKey(t, { ignoreWhitespace: false })); 
+					map.push(t); 
+				}
 				continue;
 			}
-			for (const sub of splitSubwords(t)) { norm.push(sub); map.push(sub); }
+			for (const sub of splitSubwords(t)) { 
+				norm.push(compareKey(sub, { ignoreWhitespace: ops.ignoreWhitespace })); 
+				map.push(sub); 
+			}
 		}
 		return { norm, map };
 	}
 
-	const A = buildTokens(a);
-	const B = buildTokens(b);
-	const equals = (i: number, j: number) => A.norm[i] === B.norm[j]; // strict equality
+	const A = buildTokens(aN, a);
+	const B = buildTokens(bN, b);
+    const equals = (i: number, j: number) => A.norm[i] === B.norm[j]; // strict equality; mirrors line DP normalization
 	const opsSeq = lcsIndices(A.norm, B.norm, equals);
 
 	const segs: DiffSeg[] = [];

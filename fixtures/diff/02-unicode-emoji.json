@@ -1,0 +1,17 @@
+{
+  "name": "Unicode emoji and ZWJ sequences",
+  "description": "Tests grapheme-safe tokenization - emojis should never be split",
+  "left": "Hello 👨‍👩‍👧‍👦 family\nFlags: 🇺🇸🇫🇷\nCombining: café",
+  "right": "Hello 👨‍👩‍👧‍👦 group\nFlags: 🇺🇸🇩🇪\nCombining: cafe",
+  "expectedSteps": [
+    {"type": "mod", "leftNum": 1, "rightNum": 1},
+    {"type": "mod", "leftNum": 2, "rightNum": 2},
+    {"type": "mod", "leftNum": 3, "rightNum": 3}
+  ],
+  "expectedStats": {"deleted": 0, "added": 0, "modified": 3, "unchanged": 0},
+  "unicodeSafety": {
+    "zwjFamily": "👨‍👩‍👧‍👦",
+    "flags": ["🇺🇸", "🇫🇷", "🇩🇪"],
+    "combining": ["café", "cafe"]
+  }
+}

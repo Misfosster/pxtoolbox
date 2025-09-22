@@ -32,6 +32,7 @@ const DiffViewerTool: React.FC = () => {
   const [leftCollapsed, setLeftCollapsed] = useState<boolean>(true);
   const [rightCollapsed, setRightCollapsed] = useState<boolean>(true);
   const [alteredOnly, setAlteredOnly] = useLocalStorageBoolean('pxtoolbox.diff.alteredOnly', false);
+  const [changedOnlyPreview, setChangedOnlyPreview] = useLocalStorageBoolean('pxtoolbox.diff.changedOnlyPreview', false);
   const [leftScrollTop, setLeftScrollTop] = useState<number>(0);
   const [rightScrollTop, setRightScrollTop] = useState<number>(0);
   const [leftHeight, setLeftHeight] = useState<number>(140);
@@ -63,52 +64,98 @@ const DiffViewerTool: React.FC = () => {
   const rightNorm = useMemo(() => normalizeEOL(debRight), [debRight]);
   // Normalize EOLs (immediate) previously used for overlay; retained approach removed to keep one source of truth
 
-  // Build index-preserving alignment steps used for preview (debounced)
-  const { steps, leftLines, rightLines } = useMemo(() => {
-    const a = splitLinesNoTrailingEmpty(leftNorm);
-    const b = splitLinesNoTrailingEmpty(rightNorm);
-    const s = alignLines(a, b, { ignoreWhitespace: debIgnoreWs });
-    return { steps: s, leftLines: a, rightLines: b };
+  // Build alignment (steps + local numbering) used for side-by-side view and overlay (debounced)
+  const { steps } = useMemo(() => {
+    return alignLines(leftNorm, rightNorm, { ignoreWhitespace: debIgnoreWs });
   }, [leftNorm, rightNorm, debIgnoreWs]);
+
+
+  // Split lines for content lookup
+  const leftLines = useMemo(() => splitLinesNoTrailingEmpty(leftNorm), [leftNorm]);
+  const rightLines = useMemo(() => splitLinesNoTrailingEmpty(rightNorm), [rightNorm]);
 
   // Note: overlays use the same steps as preview to keep a single source of truth.
 
-  // Build inline overlay segments per side from the SAME alignment steps (single source of truth)
-  const { leftOverlayLines, rightOverlayLines } = useMemo(() => {
-    const leftArr: DiffSeg[][] = [];
-    const rightArr: DiffSeg[][] = [];
+  // Build inline overlay segments and line roles per side mapped to ACTUAL lines per side (no placeholder rows)
+  const { leftOverlayLines, rightOverlayLines, leftLineRoles, rightLineRoles } = useMemo(() => {
+    const leftArr: DiffSeg[][] = new Array(leftLines.length);
+    const rightArr: DiffSeg[][] = new Array(rightLines.length);
+    const leftRoles: ('none' | 'add' | 'del')[] = new Array(leftLines.length).fill('none');
+    const rightRoles: ('none' | 'add' | 'del')[] = new Array(rightLines.length).fill('none');
+    
+    
     for (const st of steps) {
       if (st.type === 'same') {
-        const t = leftLines[st.i as number] || '';
-        const seg: DiffSeg = { text: t, changed: false };
-        leftArr.push([seg]);
-        rightArr.push([seg]);
+        const li = (st as any).i as number;
+        const rj = (st as any).j as number;
+        const lText = leftLines[li] || '';
+        const rText = rightLines[rj] || '';
+        console.log(`SAME line ${li}/${rj}: "${lText}" === "${rText}"`);
+        // For 'same' lines, never run intraline diff - they are considered identical
+        leftArr[li] = [{ text: lText, changed: false }];
+        rightArr[rj] = [{ text: rText, changed: false }];
         continue;
       }
       if (st.type === 'del') {
-        const t = leftLines[st.i as number] || '';
-        leftArr.push([{ text: t, changed: true, diffType: 'del' }]);
-        // Keep right array aligned by pushing an unchanged empty placeholder
-        rightArr.push([{ text: '', changed: false }]);
+        const li = (st as any).i as number;
+        const lText = leftLines[li] || '';
+        leftArr[li] = [{ text: lText, changed: true, diffType: 'del' }];
+        leftRoles[li] = 'del'; // Whole line del tint
+        // Right side has no row for pure deletions
         continue;
       }
       if (st.type === 'add') {
-        const t = rightLines[st.j as number] || '';
-        // Keep left array aligned by pushing an unchanged empty placeholder
-        leftArr.push([{ text: '', changed: false }]);
-        rightArr.push([{ text: t, changed: true, diffType: 'add' }]);
+        const rj = (st as any).j as number;
+        const rText = rightLines[rj] || '';
+        rightArr[rj] = [{ text: rText, changed: true, diffType: 'add' }];
+        rightRoles[rj] = 'add'; // Whole line add tint
+        // Left side has no row for pure additions
         continue;
       }
       if (st.type === 'mod') {
-        const aRaw = leftLines[st.i as number] || '';
-        const bRaw = rightLines[st.j as number] || '';
-        const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: debIgnoreWs, mode: debCharInline ? 'char' : 'word' });
-        // Both sides receive all segments; overlay hides non-relevant kinds via props
-        leftArr.push(segs);
-        rightArr.push(segs);
+        const li = (st as any).i as number;
+        const rj = (st as any).j as number;
+        const aRaw = leftLines[li] || '';
+        const bRaw = rightLines[rj] || '';
+        
+        // For overlays, always use ignoreWhitespace: false to ensure segments align with raw textarea content
+        // The line alignment already handled whitespace normalization at the line level  
+        const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: false, mode: debCharInline ? 'char' : 'word' });
+        
+        // For mod steps in unified preview: show the LEFT content (not segments)
+        // This ensures the unified preview shows the original left content with ~ marker
+        
+        // LEFT overlay: keep eq + del only (hide add to match textarea content)
+        leftArr[li] = segs.filter(s => !s.changed || s.diffType === 'del');
+        leftRoles[li] = 'del'; // Left side gets del tint for mod
+        
+        // RIGHT overlay: keep eq + add only (hide del to match textarea content)  
+        rightArr[rj] = segs.filter(s => !s.changed || s.diffType === 'add');
+        rightRoles[rj] = 'add'; // Right side gets add tint for mod
+        
+        // Guardrail: verify overlay text matches textarea content
+        if (process.env.NODE_ENV !== 'production') {
+          const leftOverlayText = leftArr[li].map(s => s.text).join('');
+          const rightOverlayText = rightArr[rj].map(s => s.text).join('');
+          
+          if (leftOverlayText !== aRaw) {
+            console.warn(`Left overlay mismatch at line ${li + 1}:`, { expected: aRaw, got: leftOverlayText });
+          }
+          if (rightOverlayText !== bRaw) {
+            console.warn(`Right overlay mismatch at line ${rj + 1}:`, { expected: bRaw, got: rightOverlayText });
+          }
+        }
       }
     }
-    return { leftOverlayLines: leftArr, rightOverlayLines: rightArr };
+    // Fill any untouched lines as unchanged segments to preserve mirror layout
+    for (let i = 0; i < leftArr.length; i++) if (!leftArr[i]) leftArr[i] = [{ text: leftLines[i] || '', changed: false }];
+    for (let j = 0; j < rightArr.length; j++) if (!rightArr[j]) rightArr[j] = [{ text: rightLines[j] || '', changed: false }];
+    return { 
+      leftOverlayLines: leftArr, 
+      rightOverlayLines: rightArr,
+      leftLineRoles: leftRoles,
+      rightLineRoles: rightRoles
+    };
   }, [steps, leftLines, rightLines, debIgnoreWs, debCharInline]);
 
   return (
@@ -147,6 +194,7 @@ const DiffViewerTool: React.FC = () => {
                   maxRows={leftCollapsed ? 6 : undefined}
                   autosize={false}
                   resizable="none"
+                  spellCheck={false}
                   style={{
                     paddingLeft: GUTTER_WIDTH_PX + CONTENT_GAP_PX,
                     whiteSpace: 'pre-wrap',
@@ -158,8 +206,9 @@ const DiffViewerTool: React.FC = () => {
                   inputRef={(el) => (leftRef.current = el)}
                 />
                 {!alteredOnly && (
-                  <InlineTokenOverlay
-                    segmentsPerLine={leftOverlayLines}
+            <InlineTokenOverlay
+              id="diff-left-overlay"
+              segmentsPerLine={leftOverlayLines}
                     leftOffsetPx={GUTTER_WIDTH_PX + CONTENT_GAP_PX}
                     topOffsetPx={leftMetrics.paddingTop}
                     scrollTop={leftScrollTop}
@@ -171,9 +220,12 @@ const DiffViewerTool: React.FC = () => {
                     lineHeightPx={leftMetrics.lineHeight}
                     showAdd={false}
                     showDel={true}
+                    side="left"
+                    lineRoles={leftLineRoles}
                   />
                 )}
                 <div
+                  data-testid="diff-left-gutter"
                   aria-hidden
                   style={{
                     position: 'absolute',
@@ -264,6 +316,7 @@ const DiffViewerTool: React.FC = () => {
                   maxRows={rightCollapsed ? 6 : undefined}
                   autosize={false}
                   resizable="none"
+                  spellCheck={false}
                   style={{
                     paddingLeft: GUTTER_WIDTH_PX + CONTENT_GAP_PX,
                     whiteSpace: 'pre-wrap',
@@ -274,8 +327,9 @@ const DiffViewerTool: React.FC = () => {
                   }}
                   inputRef={(el) => (rightRef.current = el)}
                 />
-                <InlineTokenOverlay
-                  segmentsPerLine={rightOverlayLines}
+            <InlineTokenOverlay
+              id="diff-right-overlay"
+              segmentsPerLine={rightOverlayLines}
                   leftOffsetPx={GUTTER_WIDTH_PX + CONTENT_GAP_PX}
                   topOffsetPx={rightMetrics.paddingTop}
                   scrollTop={rightScrollTop}
@@ -287,8 +341,11 @@ const DiffViewerTool: React.FC = () => {
                   lineHeightPx={rightMetrics.lineHeight}
                   showAdd={true}
                   showDel={!alteredOnly}
+                  side="right"
+                  lineRoles={rightLineRoles}
                 />
                 <div
+                  data-testid="diff-right-gutter"
                   aria-hidden
                   style={{
                     position: 'absolute',
@@ -369,6 +426,25 @@ const DiffViewerTool: React.FC = () => {
         <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
           <div style={{ flex: '1 1 0', width: '100%' }}>
             <Field label="Unified diff (preview)" inputId="diff-output">
+              {(() => {
+                let addCount = 0, delCount = 0, modCount = 0;
+                for (const st of steps) {
+                  if (st.type === 'add') addCount++;
+                  else if (st.type === 'del') delCount++;
+                  else if (st.type === 'mod') modCount++;
+                }
+                return (
+                  <div data-testid="diff-counters" style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8, color: 'rgba(138,155,168,0.9)' }}>
+                    <span data-testid="count-add" style={{ color: 'rgba(46,160,67,0.9)' }}>+{addCount}</span>
+                    <span data-testid="count-del" style={{ color: 'rgba(248,81,73,0.9)' }}>-{delCount}</span>
+                    <span data-testid="count-mod" style={{ color: 'rgba(100,148,237,0.9)' }}>~{modCount}</span>
+                    <span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>Changed-only preview</span>
+                      <Switch checked={changedOnlyPreview} onChange={(e) => setChangedOnlyPreview((e.currentTarget as HTMLInputElement).checked)} aria-label="Changed-only preview" label={undefined} style={{ margin: 0 }} />
+                    </span>
+                  </div>
+                );
+              })()}
               <div
                 id="diff-output"
                 style={{
@@ -391,7 +467,7 @@ const DiffViewerTool: React.FC = () => {
 
                   type LocalSeg = { text: string; changed: boolean; diffType?: 'add' | 'del' };
 
-                  function renderLine(displayNum: number, marker: '+' | '-' | ' ' | '~', content: string, segments?: LocalSeg[]) {
+                  function renderLine(rowKey: string, displayNum: number, marker: '+' | '-' | ' ' | '~', content: string, segments?: LocalSeg[]) {
                     const isAdd = marker === '+';
                     const isDel = marker === '-';
                     const isMod = marker === '~';
@@ -402,11 +478,11 @@ const DiffViewerTool: React.FC = () => {
                       : isMod
                       ? 'var(--diff-mod-bg)'
                       : 'transparent';
-                    const fg = isAdd ? '#7ee787' : isDel ? '#ffa198' : muted;
+                    const fg = muted;
                     const cls = isAdd ? 'diff-line add' : isDel ? 'diff-line del' : isMod ? 'diff-line mod' : 'diff-line';
                     return (
                       <div
-                        key={`l-${displayNum}-${marker}`}
+                        key={rowKey}
                         data-preview-line
                         data-marker={marker}
                         data-display-index={displayNum}
@@ -420,7 +496,7 @@ const DiffViewerTool: React.FC = () => {
                         <span style={{ whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere', minWidth: 0 }}>
                           {segments
                             ? segments.map((s, i) => (
-                                <span key={i} className={s.changed ? (s.diffType === 'add' ? 'diff-span add' : 'diff-span del') : undefined}>
+                                <span key={i} className={s.changed ? (s.diffType === 'add' ? 'diff-seg diff-add' : 'diff-seg diff-del') : undefined} data-diff-token data-type={s.changed ? (s.diffType === 'add' ? 'add' : 'del') : 'eq'}>
                                   {s.text || ' '}
                                 </span>
                               ))
@@ -430,27 +506,71 @@ const DiffViewerTool: React.FC = () => {
                     );
                   }
 
-                  for (const st of steps) {
+                  // Use the same alignment as side-by-side view to ensure emoji pairing consistency
+                  // Handle empty field cases
+                  const leftIsEmpty = leftNorm.trim() === '';
+                  const rightIsEmpty = rightNorm.trim() === '';
+                  
+                  let unifiedSteps: any[];
+                  let unifiedLeftNums: number[];
+                  let unifiedRightNums: number[];
+                  
+                  if (leftIsEmpty && rightIsEmpty) {
+                    // Both empty - no diff to show
+                    unifiedSteps = [];
+                    unifiedLeftNums = [];
+                    unifiedRightNums = [];
+                  } else if (leftIsEmpty && !rightIsEmpty) {
+                    // Only right side has content - show as all additions
+                    const rightLines = splitLinesNoTrailingEmpty(rightNorm);
+                    unifiedSteps = rightLines.map((_, j) => ({ type: 'add' as const, j }));
+                    unifiedLeftNums = rightLines.map(() => 0);
+                    unifiedRightNums = rightLines.map((_, j) => j + 1);
+                  } else if (!leftIsEmpty && rightIsEmpty) {
+                    // Only left side has content - show as all deletions
+                    const leftLines = splitLinesNoTrailingEmpty(leftNorm);
+                    unifiedSteps = leftLines.map((_, i) => ({ type: 'del' as const, i }));
+                    unifiedLeftNums = leftLines.map((_, i) => i + 1);
+                    unifiedRightNums = leftLines.map(() => 0);
+                  } else {
+                    // Both have content - normal diff
+                    const result = alignLines(leftNorm, rightNorm, { ignoreWhitespace: debIgnoreWs });
+                    unifiedSteps = result.steps;
+                    unifiedLeftNums = result.leftNums;
+                    unifiedRightNums = result.rightNums;
+                  }
+                  
+                  for (let idx = 0; idx < unifiedSteps.length; idx++) {
+                    const st = unifiedSteps[idx] as any;
+                    if (changedOnlyPreview && st.type === 'same') continue;
                     if (st.type === 'same') {
                       const t = leftLines[st.i as number] || '';
-                      rows.push(renderLine((st.i as number) + 1, ' ', t));
+                      const num = (unifiedLeftNums && unifiedLeftNums[idx]) ? unifiedLeftNums[idx] : (st.i as number) + 1;
+                      rows.push(renderLine(`same-${idx}`, num, ' ', t));
                       continue;
                     }
                     if (st.type === 'del') {
                       const t = leftLines[st.i as number] || '';
-                      rows.push(renderLine((st.i as number) + 1, '-', t));
+                      // - rows: use leftNums[idx] (left local numbers, no renumbering drift)
+                      const num = (unifiedLeftNums && unifiedLeftNums[idx]) ? unifiedLeftNums[idx] : (st.i as number) + 1;
+                      rows.push(renderLine(`del-${idx}`, num, '-', t));
                       continue;
                     }
                     if (st.type === 'add') {
                       const t = rightLines[st.j as number] || '';
-                      rows.push(renderLine((st.j as number) + 1, '+', t));
+                      // + rows: use rightNums[idx] (right local numbers)
+                      const num = (unifiedRightNums && unifiedRightNums[idx]) ? unifiedRightNums[idx] : (st.j as number) + 1;
+                      rows.push(renderLine(`add-${idx}`, num, '+', t));
                       continue;
                     }
                     if (st.type === 'mod') {
                       const aRaw = leftLines[st.i as number] || '';
                       const bRaw = rightLines[st.j as number] || '';
                       const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: debIgnoreWs, mode: debCharInline ? 'char' : 'word' }) as unknown as LocalSeg[];
-                      rows.push(renderLine((st.i as number) + 1, '~', '', segs));
+                      // ~ rows: use leftNums[idx] (left local numbers) 
+                      const num = (unifiedLeftNums && unifiedLeftNums[idx]) ? unifiedLeftNums[idx] : (st.i as number) + 1;
+                      // For unified preview: show the LEFT content with segments for highlighting
+                      rows.push(renderLine(`mod-${idx}`, num, '~', aRaw, segs));
                     }
                   }
                   return rows;

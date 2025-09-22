@@ -1,0 +1,18 @@
+{
+  "name": "Various quote types and punctuation",
+  "description": "Tests handling of different quote styles and special punctuation",
+  "left": "He said \\\"Hello\\\" today.\\nShe replied 'Goodbye'!\\nM-dash—test\\nEllipsis...end",
+  "right": "He said \\\"Hello\\\" today.\\nShe replied 'Farewell'!\\nN-dash–test\\nEllipsis…end",
+  "expectedSteps": [
+    {"type": "same", "leftNum": 1, "rightNum": 1},
+    {"type": "mod", "leftNum": 2, "rightNum": 2},
+    {"type": "mod", "leftNum": 3, "rightNum": 3},
+    {"type": "mod", "leftNum": 4, "rightNum": 4}
+  ],
+  "expectedStats": {"deleted": 0, "added": 0, "modified": 3, "unchanged": 1},
+  "punctuationChanges": [
+    {"from": "'Goodbye'", "to": "'Farewell'"},
+    {"from": "—", "to": "–"},
+    {"from": "...", "to": "…"}
+  ]
+}
