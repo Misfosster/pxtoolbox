@@ -6,14 +6,40 @@ import {
   H4,
   Classes,
   Button,
-  Intent
+  Intent,
+  Tag
 } from '@blueprintjs/core';
+import { getVisibleTools } from '../tools/registry';
+
+const getToolDescription = (toolId: string): string => {
+  const descriptions: Record<string, string> = {
+    base64: 'Encode and decode Base64 strings with real-time conversion between text and Base64 formats.',
+    jwt: 'Decode and inspect JWT tokens with header, payload, and signature analysis.',
+    url: 'Encode and decode URL components with proper percent-encoding for safe web transmission.',
+    json: 'Format, validate, and edit JSON with a collapsible tree view and inline editing capabilities.',
+    diff: 'Compare text files with side-by-side highlighting, unified preview, and smart alignment algorithms.'
+  };
+  return descriptions[toolId] || 'Developer utility tool for common tasks.';
+};
 
 const Home: React.FC = () => {
+  const currentVersion = "0.1.0";
+  const releaseDate = "2025-09-23";
+  const tools = getVisibleTools();
+
   return (
     <div className="home-container">
-      <Card elevation={2} className="welcome-card">
-        <H1>Welcome to PX Toolbox</H1>
+      {/* Release Status Card */}
+      <Card elevation={2} className="release-card">
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <H1 style={{ margin: 0 }}>PX Toolbox</H1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <Tag intent={Intent.SUCCESS} large icon="tick">
+              v{currentVersion}
+            </Tag>
+            <span className={Classes.TEXT_MUTED}>Released {releaseDate}</span>
+          </div>
+        </div>
         <p className={Classes.TEXT_LARGE}>
           A collection of developer utilities for the Pernexus team.
         </p>
@@ -24,29 +50,85 @@ const Home: React.FC = () => {
         </p>
       </Card>
 
+      {/* Available Tools */}
+      <Card elevation={1} className="tools-card">
+        <H3>🛠 Available Tools</H3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginTop: 16 }}>
+          {tools.map((tool) => (
+            <Card key={tool.id} elevation={0} className="tool-preview-card" style={{ padding: 16, border: '1px solid var(--bp4-color-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', marginBottom: 8 }}>
+                <span style={{ marginRight: 8, fontSize: '16px' }}>🔧</span>
+                <H4 style={{ margin: 0 }}>{tool.label}</H4>
+              </div>
+              <p style={{ margin: '8px 0', fontSize: '14px', color: 'var(--bp4-color-text-muted)' }}>
+                {getToolDescription(tool.id)}
+              </p>
+              <Button 
+                small 
+                intent={Intent.PRIMARY}
+                onClick={() => window.location.href = `#/tools/${tool.path}`}
+              >
+                Open Tool
+              </Button>
+            </Card>
+          ))}
+        </div>
+      </Card>
+
       <Card elevation={1} className="status-card">
-        <H3>🚧 Development Status</H3>
+        <H3>✅ Production Status</H3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
+          <div>
+            <H4 style={{ margin: '0 0 8px 0', color: 'var(--bp4-color-text-muted)' }}>Test Coverage</H4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: 'var(--bp4-color-success)' }}>✅</span>
+              <span>98 unit tests + 53 E2E tests</span>
+            </div>
+          </div>
+          <div>
+            <H4 style={{ margin: '0 0 8px 0', color: 'var(--bp4-color-text-muted)' }}>Security</H4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: 'var(--bp4-color-success)' }}>🛡️</span>
+              <span>All vulnerabilities resolved</span>
+            </div>
+          </div>
+          <div>
+            <H4 style={{ margin: '0 0 8px 0', color: 'var(--bp4-color-text-muted)' }}>Deployment</H4>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{ color: 'var(--bp4-color-success)' }}>☁️</span>
+              <span>Automated CI/CD pipeline</span>
+            </div>
+          </div>
+        </div>
+        
         <p>
-          This project is currently under development during William's internship at Pernexus.
-          Tools will be added incrementally based on team needs and feedback.
+          The PX Toolbox is now production-ready with comprehensive testing, security compliance, 
+          and automated deployment. All core tools are fully functional and ready for team use.
         </p>
         
-        <H4>Planned Tools:</H4>
+        <H4>Future Enhancements:</H4>
         <ul>
-          <li>JWT Token Decoder - Decode and inspect JWT tokens</li>
-          <li>Text Transformations - Base64, URL encoding, JSON formatting</li>
           <li>Hash Generators - MD5, SHA1, SHA256</li>
           <li>Case Converters - camelCase, snake_case, kebab-case</li>
-          <li>API Testing Tools - Quick HTTP requests and response formatting</li>
+          <li>Color Code Converters - HEX, RGB, HSL</li>
+          <li>Regex Testers - Pattern matching and validation</li>
+          <li>Mobile optimizations and responsive improvements</li>
         </ul>
 
-        <div style={{ marginTop: 20 }}>
+        <div style={{ marginTop: 20, display: 'flex', gap: 12 }}>
           <Button 
             intent={Intent.PRIMARY} 
             icon="code"
-            onClick={() => window.open('https://misfosster.github.io/pxtoolbox/', '_blank')}
+            onClick={() => window.open('https://github.com/misfosster/pxtoolbox', '_blank')}
           >
-            View on GitHub
+            View Source
+          </Button>
+          <Button 
+            intent={Intent.NONE} 
+            icon="document"
+            onClick={() => window.open('https://github.com/misfosster/pxtoolbox/releases', '_blank')}
+          >
+            Release Notes
           </Button>
         </div>
       </Card>
