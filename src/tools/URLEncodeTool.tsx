@@ -53,6 +53,7 @@ const URLEncodeTool: React.FC = () => {
     <ToolShell
       title="URL Encoder/Decoder"
       description="Convert text to and from URL encoding (encodeURIComponent/decodeURIComponent). '+' treated as space on decode. All processing happens locally."
+      toolId="url"
     >
       <Card elevation={1}>
         <div className="dual-pane" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 8 }}>

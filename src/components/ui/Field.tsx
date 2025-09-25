@@ -3,7 +3,7 @@ import { FormGroup, Intent } from '@blueprintjs/core';
 
 export interface FieldProps {
   /** Visible label above the control */
-  label: string;
+  label: string | React.ReactNode;
   /** Id of the primary input (used for labelFor) */
   inputId: string;
   /** Optional helper or error text */

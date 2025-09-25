@@ -162,6 +162,7 @@ const DiffViewerTool: React.FC = () => {
     <ToolShell
       title="Diff Viewer"
       description="Compare two texts side by side. Inline diffs use smart word-level by default (small edits within a word are considered similar); enable the toggle to diff per character. Unified diff is shown centered below."
+      toolId="diff"
     >
       <Card elevation={1}>
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>

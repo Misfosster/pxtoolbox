@@ -10,6 +10,7 @@ import {
   Tag
 } from '@blueprintjs/core';
 import { getVisibleTools } from '../tools/registry';
+import { useFavorites } from '../hooks/useFavorites';
 
 const getToolDescription = (toolId: string): string => {
   const descriptions: Record<string, string> = {
@@ -25,7 +26,11 @@ const getToolDescription = (toolId: string): string => {
 const Home: React.FC = () => {
   const currentVersion = "0.1.0";
   const releaseDate = "2025-09-23";
-  const tools = getVisibleTools();
+  const allTools = getVisibleTools();
+  const { isFavorite } = useFavorites();
+  
+  // Show only favorited tools
+  const tools = allTools.filter(tool => isFavorite(tool.id));
 
   return (
     <div className="home-container">
@@ -50,9 +55,16 @@ const Home: React.FC = () => {
         </p>
       </Card>
 
-      {/* Available Tools */}
+      {/* Favorite Tools */}
       <Card elevation={1} className="tools-card">
-        <H3>🛠 Available Tools</H3>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <H3>⭐ Favorite Tools</H3>
+          {tools.length > 0 && (
+            <Tag intent={Intent.PRIMARY} minimal>
+              {tools.length} favorite{tools.length !== 1 ? 's' : ''}
+            </Tag>
+          )}
+        </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: 16, marginTop: 16 }}>
           {tools.map((tool) => (
             <Card key={tool.id} elevation={0} className="tool-preview-card" style={{ padding: 16, border: '1px solid var(--bp4-color-border)' }}>
@@ -73,6 +85,13 @@ const Home: React.FC = () => {
             </Card>
           ))}
         </div>
+        {tools.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--bp4-color-text-muted)' }}>
+            <div style={{ fontSize: '48px', marginBottom: 16, opacity: 0.5 }}>⭐</div>
+            <p>No favorite tools selected yet.</p>
+            <p>Use the star icons in the sidebar to add tools to your favorites.</p>
+          </div>
+        )}
       </Card>
 
       <Card elevation={1} className="status-card">

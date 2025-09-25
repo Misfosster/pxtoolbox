@@ -58,7 +58,11 @@ const Base64Tool: React.FC = () => {
   }
 
   return (
-    <ToolShell title="Base64 Encoder/Decoder" description="Convert text to and from Base64 (supports Base64URL, missing padding, and whitespace). All processing happens locally in your browser.">
+    <ToolShell 
+      title="Base64 Encoder/Decoder" 
+      description="Convert text to and from Base64 (supports Base64URL, missing padding, and whitespace). All processing happens locally in your browser."
+      toolId="base64"
+    >
       <Card elevation={1}>
         <div className="dual-pane" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: 8 }}>
           <Field label="Text" inputId="b64-input">

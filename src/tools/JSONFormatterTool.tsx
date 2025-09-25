@@ -87,19 +87,7 @@ const JSONFormatterTool: React.FC = () => {
     <ToolShell
       title="JSON Formatter"
       description="Validate, pretty‑print, and minify JSON. Edit either side; changes are validated live."
-      actions={(
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button
-            icon={textCollapsed ? 'panel-table' : 'panel-stats'}
-            minimal
-            small
-            onClick={() => setTextCollapsed((v) => !v)}
-            data-testid="toggle-text-pane"
-          >
-            {textCollapsed ? 'Expand text' : 'Collapse text'}
-          </Button>
-        </div>
-      )}
+      toolId="json"
     >
       <Card elevation={1}>
         <div
@@ -119,26 +107,40 @@ const JSONFormatterTool: React.FC = () => {
               ...(textCollapsed ? { height: 40, maxHeight: 40 } : {})
             }}
           >
-            {textCollapsed ? (
-              <div style={{ height: 40, border: '1px solid rgba(138,155,168,0.15)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)' }}>
-                Text (collapsed)
-              </div>
-            ) : (
-              <Field
-                label="JSON (formatted)"
-                inputId="json-input"
-                helperText={
-                  error ? undefined : (
-                    <span>
-                      Paste any JSON value (object, array, string, number, etc.).
-                      <span style={{ marginLeft: 8 }}>
-                        <strong>{leftCount}</strong> chars
-                      </span>
+            <Field
+              label={
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+                  <span>JSON (formatted)</span>
+                  <Button
+                    icon={textCollapsed ? 'panel-table' : 'panel-stats'}
+                    minimal
+                    small
+                    onClick={() => setTextCollapsed((v) => !v)}
+                    data-testid="toggle-text-pane"
+                    title={textCollapsed ? 'Expand text' : 'Collapse text'}
+                  >
+                    {textCollapsed ? 'Expand' : 'Collapse'}
+                  </Button>
+                </div>
+              }
+              inputId="json-input"
+              helperText={
+                error ? undefined : (
+                  <span>
+                    Paste any JSON value (object, array, string, number, etc.).
+                    <span style={{ marginLeft: 8 }}>
+                      <strong>{leftCount}</strong> chars
                     </span>
-                  )
-                }
-                error={error}
-              >
+                  </span>
+                )
+              }
+              error={error}
+            >
+              {textCollapsed ? (
+                <div style={{ height: 40, border: '1px solid rgba(138,155,168,0.15)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)' }}>
+                  Text (collapsed)
+                </div>
+              ) : (
                 <div style={{ position: 'relative' }}>
                   <ResizableTextArea
                     id="json-input"
@@ -180,8 +182,8 @@ const JSONFormatterTool: React.FC = () => {
                     />
                   </OverlayActions>
                 </div>
-              </Field>
-            )}
+              )}
+            </Field>
           </div>
 
           <div

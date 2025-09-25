@@ -67,6 +67,7 @@ const JWTDecoderTool: React.FC = () => {
     <ToolShell
       title="JWT Decoder"
       description="Decode JSON Web Tokens locally. Parses header and payload, handles Base64URL and pretty-prints JSON."
+      toolId="jwt"
     >
       <Card elevation={1} style={{ marginBottom: 16, paddingBottom: 8 }}>
         <H3 style={{ marginTop: 0 }}>Token</H3>
