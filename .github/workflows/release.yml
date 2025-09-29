@@ -48,8 +48,6 @@ jobs:
           cd dist
           zip -r ../pxtoolbox-$VERSION.zip .
           cd ..
-          # Move zip to root for easier access
-          mv pxtoolbox-$VERSION.zip ./pxtoolbox-$VERSION.zip
 
       # For GitHub Pages
       - name: Configure Pages
