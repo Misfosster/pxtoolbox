@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - 'release-*'
   workflow_dispatch:
 
 permissions:
@@ -41,9 +41,15 @@ jobs:
 
       - name: Archive dist
         run: |
+          # Extract version from branch name (release-v0.1.0 -> v0.1.0)
+          VERSION=${GITHUB_REF_NAME#release-}
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Create zip file directly from dist contents (not nested)
           cd dist
-          zip -r ../pxtoolbox-${{ github.ref_name }}.zip .
-          cd -
+          zip -r ../pxtoolbox-$VERSION.zip .
+          cd ..
+          # Move zip to root for easier access
+          mv pxtoolbox-$VERSION.zip ./pxtoolbox-$VERSION.zip
 
       # For GitHub Pages
       - name: Configure Pages
@@ -59,7 +65,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: release-zip
-          path: pxtoolbox-${{ github.ref_name }}.zip
+          path: pxtoolbox-${{ env.VERSION }}.zip
 
   release:
     needs: build_and_test
@@ -73,11 +79,12 @@ jobs:
         id: changelog
         shell: bash
         run: |
-          PREV=$(git describe --tags --abbrev=0 HEAD~1 2>/dev/null || echo "")
-          if [ -n "$PREV" ]; then
-            echo "## Changes since $PREV" > CHANGELOG.md
-            git log --pretty=format:"- %s" $PREV..HEAD >> CHANGELOG.md
-          else
+          # Extract version from branch name
+          VERSION=${GITHUB_REF_NAME#release-}
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          
+          # Check if this is the first release
+          if [ "$VERSION" = "v0.1.0" ]; then
             echo "## Initial Release" > CHANGELOG.md
             echo "- First release of PX Toolbox" >> CHANGELOG.md
             echo "- Diff Viewer with inline highlights" >> CHANGELOG.md
@@ -86,15 +93,19 @@ jobs:
             echo "- Base64 Encoder/Decoder" >> CHANGELOG.md
             echo "- URL Encoder/Decoder" >> CHANGELOG.md
             echo "- Comprehensive test coverage (98 unit + 53 E2E tests)" >> CHANGELOG.md
+          else
+            # For subsequent releases, generate changelog from commits
+            echo "## Changes in $VERSION" > CHANGELOG.md
+            git log --pretty=format:"- %s" --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '')" >> CHANGELOG.md
           fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          tag_name: ${{ steps.changelog.outputs.VERSION }}
+          name: Release ${{ steps.changelog.outputs.VERSION }}
           body_path: CHANGELOG.md
           files: |
-            pxtoolbox-${{ github.ref_name }}.zip
+            pxtoolbox-${{ steps.changelog.outputs.VERSION }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
