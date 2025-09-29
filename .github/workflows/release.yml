@@ -99,6 +99,47 @@ jobs:
             git log --pretty=format:"- %s" --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '')" >> CHANGELOG.md
           fi
 
+      - name: Generate Release README
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#release-}
+          cat > RELEASE_README.md << EOF
+          # PX Toolbox $VERSION
+
+          ## 🚀 Quick Start
+
+          1. **Download** the \`pxtoolbox-$VERSION.zip\` file
+          2. **Extract** the zip file to your desired location  
+          3. **Open** \`index.html\` in your web browser
+          4. **Start using** the developer tools immediately!
+
+          ## 📋 What's New in $VERSION
+
+          $(cat CHANGELOG.md | sed -n '/## \['$VERSION'\]/,/## \[/p' | head -n -1)
+
+          ## 🛠️ Available Tools
+
+          - **Diff Viewer**: Compare text files with inline highlights
+          - **JSON Formatter**: Format, validate, and edit JSON data  
+          - **JWT Decoder**: Decode and inspect JWT tokens
+          - **Base64 Encoder/Decoder**: Encode and decode Base64 strings
+          - **URL Encoder/Decoder**: Encode and decode URL components
+
+          ## 📋 System Requirements
+
+          - Modern web browser (Chrome, Firefox, Safari, Edge)
+          - No server installation required
+          - Works offline after initial load
+
+          ## 🔗 Online Version
+
+          For the latest version and updates, visit: https://username.github.io/pxtoolbox
+
+          ## 📝 License
+
+          This project is licensed under the MIT License.
+          EOF
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -107,5 +148,6 @@ jobs:
           body_path: CHANGELOG.md
           files: |
             pxtoolbox-${{ steps.changelog.outputs.VERSION }}.zip
+            RELEASE_README.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
