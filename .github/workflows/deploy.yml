@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   workflow_run:
-    workflows: ["CI"]
+    workflows: ["Release"]
     types: [completed]
   workflow_dispatch:
 
@@ -31,27 +31,17 @@ jobs:
       - name: Set REPO_NAME for Vite base
         run: echo "REPO_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
 
-      - name: Setup Node (manual dispatch only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Build for manual dispatch
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          npm ci
-          npm run build
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Download dist artifact from CI run
-        if: github.event_name == 'workflow_run'
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: ./dist
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build project
+        run: npm run build
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
