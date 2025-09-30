@@ -1,151 +1,167 @@
 name: Release
 
 on:
-  push:
-    branches:
-      - 'release-*'
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: read
   pages: write
   id-token: write
 
 concurrency:
-  group: pages
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
-  build_and_test:
+  release:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
+    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'release-')) || (github.event_name == 'workflow_dispatch' && startsWith(github.ref_name, 'release-')) }}
 
-      - name: Setup Node
+    steps:
+      # Checkout with full history (needed for git log/describe)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          fetch-depth: 0
+
+      # Pull dist from CI when triggered via workflow_run
+      - name: List artifacts on triggering CI run
+        if: github.event_name == 'workflow_run'
+        run: |
+          echo "Artifacts for run ${{ github.event.workflow_run.id }}:"
+          gh api repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts \
+            --jq '.artifacts[].name'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download dist from CI run
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: dist
+          path: ./dist
+
+      - name: Ensure dist exists
+        if: github.event_name == 'workflow_run'
+        run: |
+          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
+            echo "::error::CI artifact 'dist' not found for run ${{ github.event.workflow_run.id }}."
+            exit 1
+          fi
+
+      # Manual dispatch fallback: build dist
+      - name: Setup Node (manual dispatch only)
+        if: github.event_name == 'workflow_dispatch'
         uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Typecheck & Build
-        run: npm run build
-
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
-
-      - name: Run Playwright tests
-        run: npm run test:e2e
-
-      - name: Archive dist
+      - name: Build for manual dispatch
+        if: github.event_name == 'workflow_dispatch'
         run: |
-          # Extract version from branch name (release-v0.1.0 -> v0.1.0)
-          VERSION=${GITHUB_REF_NAME#release-}
+          npm ci
+          npm run build
+
+      # Extract version from the release-* branch name
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
+            VERSION="${{ github.event.workflow_run.head_branch }}"
+          else
+            VERSION="${{ github.ref_name }}"
+          fi
+          VERSION="${VERSION#release-}"
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-          # Create zip file directly from dist contents (not nested)
+
+      # Create a zip from dist
+      - name: Create release zip
+        run: |
           cd dist
-          zip -r ../pxtoolbox-$VERSION.zip .
+          zip -r ../pxtoolbox-${{ steps.version.outputs.VERSION }}.zip .
           cd ..
 
-      # For GitHub Pages
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
+      # Generate CHANGELOG.md (emits "## [vX.Y.Z]" style headings)
+      - name: Generate Changelog
+        id: changelog
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          if [ "$VERSION" = "v0.1.0" ]; then
+            {
+              echo "## [v0.1.0] - Initial Release"
+              echo
+              echo "### Added"
+              echo "- First release of PX Toolbox"
+              echo "- Diff Viewer with inline highlights"
+              echo "- JSON Formatter with validation"
+              echo "- JWT Decoder with payload hints"
+              echo "- Base64 Encoder/Decoder"
+              echo "- URL Encoder/Decoder"
+              echo "- Comprehensive test coverage (98 unit + 53 E2E tests)"
+            } > CHANGELOG.md
+          else
+            {
+              echo "## [$VERSION] - $(date +%Y-%m-%d)"
+              echo
+              echo "### Changes"
+              git log --pretty=format:"- %s" --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
+            } > CHANGELOG.md
+          fi
 
+      # Short release README (slices current version section from changelog)
+      - name: Generate Release README
+        shell: bash
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          cat > RELEASE_README.md << 'EOF'
+          # PX Toolbox VERSION
+
+          ## 🚀 Quick Start
+          1. **Download** the `pxtoolbox-VERSION.zip` file
+          2. **Extract** the zip
+          3. **Open** `index.html` in your browser
+
+          ## 📋 What's New in VERSION
+          EOF
+          sed -n '/^## \['"$VERSION"'\]/,/^## \[/p' CHANGELOG.md | sed '$d' >> RELEASE_README.md || echo "No changelog section found for $VERSION" >> RELEASE_README.md
+          cat >> RELEASE_README.md << 'EOF'
+
+          ## 🛠️ Available Tools
+          - Diff Viewer — inline highlights
+          - JSON Formatter — format & validate
+          - JWT Decoder — payload hints
+          - Base64 Encoder/Decoder
+          - URL Encoder/Decoder
+          EOF
+          # Templatize VERSION strings
+          sed -i "s/VERSION/$VERSION/g" RELEASE_README.md
+
+      # Prepare Pages artifact from ./dist
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
           path: ./dist
 
-      # For Release assets
-      - name: Upload build artifact (zip)
-        uses: actions/upload-artifact@v4
-        with:
-          name: release-zip
-          path: pxtoolbox-${{ env.VERSION }}.zip
-
-  release:
-    needs: build_and_test
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: release-zip
-
-      - name: Generate Changelog
-        id: changelog
-        shell: bash
-        run: |
-          # Extract version from branch name
-          VERSION=${GITHUB_REF_NAME#release-}
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          
-          # Check if this is the first release
-          if [ "$VERSION" = "v0.1.0" ]; then
-            echo "## Initial Release" > CHANGELOG.md
-            echo "- First release of PX Toolbox" >> CHANGELOG.md
-            echo "- Diff Viewer with inline highlights" >> CHANGELOG.md
-            echo "- JSON Formatter with validation" >> CHANGELOG.md
-            echo "- JWT Decoder with payload hints" >> CHANGELOG.md
-            echo "- Base64 Encoder/Decoder" >> CHANGELOG.md
-            echo "- URL Encoder/Decoder" >> CHANGELOG.md
-            echo "- Comprehensive test coverage (98 unit + 53 E2E tests)" >> CHANGELOG.md
-          else
-            # For subsequent releases, generate changelog from commits
-            echo "## Changes in $VERSION" > CHANGELOG.md
-            git log --pretty=format:"- %s" --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '')" >> CHANGELOG.md
-          fi
-
-      - name: Generate Release README
-        shell: bash
-        run: |
-          VERSION=${GITHUB_REF_NAME#release-}
-          cat > RELEASE_README.md << EOF
-          # PX Toolbox $VERSION
-
-          ## 🚀 Quick Start
-
-          1. **Download** the \`pxtoolbox-$VERSION.zip\` file
-          2. **Extract** the zip file to your desired location  
-          3. **Open** \`index.html\` in your web browser
-          4. **Start using** the developer tools immediately!
-
-          ## 📋 What's New in $VERSION
-
-          $(cat CHANGELOG.md | sed -n '/## \['$VERSION'\]/,/## \[/p' | head -n -1)
-
-          ## 🛠️ Available Tools
-
-          - **Diff Viewer**: Compare text files with inline highlights
-          - **JSON Formatter**: Format, validate, and edit JSON data  
-          - **JWT Decoder**: Decode and inspect JWT tokens
-          - **Base64 Encoder/Decoder**: Encode and decode Base64 strings
-          - **URL Encoder/Decoder**: Encode and decode URL components
-
-          ## 📋 System Requirements
-
-          - Modern web browser (Chrome, Firefox, Safari, Edge)
-          - No server installation required
-          - Works offline after initial load
-
-          ## 🔗 Online Version
-
-          For the latest version and updates, visit: https://username.github.io/pxtoolbox
-
-          ## 📝 License
-
-          This project is licensed under the MIT License.
-          EOF
-
+      # Create GitHub Release and attach assets
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.changelog.outputs.VERSION }}
-          name: Release ${{ steps.changelog.outputs.VERSION }}
+          tag_name: ${{ steps.version.outputs.VERSION }}
+          name: Release ${{ steps.version.outputs.VERSION }}
           body_path: CHANGELOG.md
           files: |
-            pxtoolbox-${{ steps.changelog.outputs.VERSION }}.zip
+            pxtoolbox-${{ steps.version.outputs.VERSION }}.zip
             RELEASE_README.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
