@@ -11,6 +11,7 @@ import {
 } from '@blueprintjs/core';
 import { getVisibleTools } from '../tools/registry';
 import { useFavorites } from '../hooks/useFavorites';
+import { getVersionInfo } from '../utils/version';
 
 const getToolDescription = (toolId: string): string => {
   const descriptions: Record<string, string> = {
@@ -24,8 +25,7 @@ const getToolDescription = (toolId: string): string => {
 };
 
 const Home: React.FC = () => {
-  const currentVersion = "0.1.0";
-  const releaseDate = "2025-09-23";
+  const { version: currentVersion, releaseDate } = getVersionInfo();
   const allTools = getVisibleTools();
   const { isFavorite } = useFavorites();
   
@@ -40,7 +40,7 @@ const Home: React.FC = () => {
           <H1 style={{ margin: 0 }}>PX Toolbox</H1>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <Tag intent={Intent.SUCCESS} large icon="tick">
-              v{currentVersion}
+              {currentVersion}
             </Tag>
             <span className={Classes.TEXT_MUTED}>Released {releaseDate}</span>
           </div>
