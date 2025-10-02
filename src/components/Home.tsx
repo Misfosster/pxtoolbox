@@ -80,7 +80,7 @@ const Home: React.FC = () => {
               <Button 
                 small 
                 intent={Intent.PRIMARY}
-                onClick={() => window.location.href = `#/tools/${tool.path}`}
+                onClick={() => window.location.href = `/tools/${tool.path}`}
               >
                 Open Tool
               </Button>
@@ -133,10 +133,11 @@ const Home: React.FC = () => {
                   key={release.version}
                   style={{ 
                     padding: '20px',
-                    backgroundColor: status === 'current' ? 'var(--bp4-color-background-light)' : 'transparent',
+                    backgroundColor: status === 'current' ? 'var(--bp4-color-background-light)' : 'var(--bp4-color-background)',
                     borderRadius: '12px',
                     border: status === 'current' ? '2px solid var(--bp4-color-primary)' : '1px solid var(--bp4-color-border)',
-                    boxShadow: status === 'current' ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none'
+                    boxShadow: '0 8px 16px rgba(0, 0, 0, 0.15)',
+                    marginBottom: '16px'
                   }}
                 >
                   {/* Header with version, date, and badges */}
@@ -197,44 +198,26 @@ const Home: React.FC = () => {
                         border: '1px solid var(--bp4-color-border)'
                       }}>
                         <p style={{ margin: 0, fontSize: '14px', color: 'var(--bp4-color-text-muted)', lineHeight: '1.5' }}>
-                          {release.description}
+                          - {release.description}
                         </p>
                       </div>
                     </div>
                   )}
                   
-                  {/* Compatibility info */}
-                  <div style={{ 
-                    display: 'flex', 
-                    justifyContent: 'space-between', 
-                    alignItems: 'center',
-                    padding: '12px 16px',
-                    backgroundColor: 'var(--bp4-color-background)',
-                    borderRadius: '8px',
-                    border: '1px solid var(--bp4-color-border)'
-                  }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: 'var(--bp4-color-success)' }}>🌐</span>
-                        <span style={{ fontSize: '12px', color: 'var(--bp4-color-text-muted)' }}>Browser Compatible</span>
-                      </div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <span style={{ color: 'var(--bp4-color-primary)' }}>📦</span>
-                        <span style={{ fontSize: '12px', color: 'var(--bp4-color-text-muted)' }}>No Dependencies</span>
-                      </div>
-                    </div>
+                  {/* Compare button at bottom right */}
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 16 }}>
                     <Button 
-                      minimal 
                       small 
-                      intent={Intent.NONE}
-                      icon="external-link"
+                      intent={Intent.PRIMARY}
+                      icon="git-branch"
+                      outlined
                       onClick={() => {
                         // Compare to previous release, or to initial commit if this is the first release
                         const previousRelease = index < recentReleases.length - 1 ? recentReleases[index + 1].version : 'main';
                         window.open(`https://github.com/misfosster/pxtoolbox/compare/${previousRelease}...${release.version}`, '_blank');
                       }}
                     >
-                      Compare
+                      Compare Changes
                     </Button>
                   </div>
                 </div>
@@ -261,21 +244,35 @@ const Home: React.FC = () => {
           <li>Mobile optimizations and responsive improvements</li>
         </ul>
 
-        <div style={{ marginTop: 20, display: 'flex', gap: 12 }}>
-          <Button 
-            intent={Intent.PRIMARY} 
-            icon="code"
-            onClick={() => window.open('https://github.com/misfosster/pxtoolbox', '_blank')}
-          >
-            View Source
-          </Button>
-          <Button 
-            intent={Intent.NONE} 
-            icon="document"
-            onClick={() => window.open('https://github.com/misfosster/pxtoolbox/releases', '_blank')}
-          >
-            Release Notes
-          </Button>
+        <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: 12 }}>
+            <Button 
+              intent={Intent.PRIMARY} 
+              icon="code"
+              onClick={() => window.open('https://github.com/misfosster/pxtoolbox', '_blank')}
+            >
+              View Source
+            </Button>
+            <Button 
+              intent={Intent.NONE} 
+              icon="document"
+              onClick={() => window.open('https://github.com/misfosster/pxtoolbox/releases', '_blank')}
+            >
+              Release Notes
+            </Button>
+          </div>
+          
+          {/* Compatibility info on the right */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--bp4-color-success)' }}>🌐</span>
+              <span style={{ fontSize: '12px', color: 'var(--bp4-color-text-muted)' }}>Browser Compatible</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+              <span style={{ color: 'var(--bp4-color-primary)' }}>📦</span>
+              <span style={{ fontSize: '12px', color: 'var(--bp4-color-text-muted)' }}>No Dependencies</span>
+            </div>
+          </div>
         </div>
       </Card>
 
