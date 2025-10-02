@@ -16,44 +16,29 @@ export default defineConfig(() => {
   const packageJson = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8'))
   const packageVersion = packageJson.version
 
-  // Extract version from release branch or use package.json version
+  // Extract version from latest git tag or use package.json version
   let appVersion = packageVersion
   let releaseDate = new Date().toISOString().split('T')[0]
 
-  // Try to extract version from branch name (works in both CI and local dev)
-  let branchName = process.env.GITHUB_REF_NAME || process.env.GITHUB_HEAD_REF || process.env.GIT_BRANCH
-  
-  // In development, try to get branch name from git
-  if (!branchName && !isCI) {
-    try {
-      branchName = execSync('git branch --show-current', { encoding: 'utf8' }).trim()
-    } catch (error) {
-      console.warn('Could not get git branch name:', error instanceof Error ? error.message : String(error))
-    }
-  }
-  
-  if (branchName) {
-    if (branchName.startsWith('release-')) {
-      appVersion = branchName.replace('release-', '')
-    } else {
-      // For non-release branches, show the branch name as the version
-      appVersion = branchName
-    }
-  }
-
-  // For release branches, try to get the actual release date from git
-  if (branchName && branchName.startsWith('release-')) {
-    try {
-      // Try to get the date when this release branch was created
-      // Get the date of the first commit on this release branch
-      const gitDate = execSync(`git log --format="%ci" --reverse -n 1`, { encoding: 'utf8' }).trim()
-      if (gitDate) {
-        releaseDate = gitDate.split(' ')[0] // Extract just the date part
+  // Try to get the latest git tag (works in both CI and local dev)
+  try {
+    // Get the latest tag, sorted by version
+    const latestTag = execSync('git tag --sort=-version:refname', { encoding: 'utf8' }).trim().split('\n')[0]
+    if (latestTag) {
+      appVersion = latestTag
+      
+      // Try to get the date when this tag was created
+      try {
+        const gitDate = execSync(`git log -1 --format="%ci" ${latestTag}`, { encoding: 'utf8' }).trim()
+        if (gitDate) {
+          releaseDate = gitDate.split(' ')[0] // Extract just the date part
+        }
+      } catch (error) {
+        console.warn('Could not get git tag date, using current date:', error instanceof Error ? error.message : String(error))
       }
-    } catch (error) {
-      // Fallback to current date if git command fails
-      console.warn('Could not get git release date, using current date:', error instanceof Error ? error.message : String(error))
     }
+  } catch (error) {
+    console.warn('Could not get latest git tag, using package.json version:', error instanceof Error ? error.message : String(error))
   }
 
   return {
