@@ -41,6 +41,40 @@ export default defineConfig(() => {
     console.warn('Could not get latest git tag, using package.json version:', error instanceof Error ? error.message : String(error))
   }
 
+  // Get recent releases for homepage display
+  let recentReleases: Array<{version: string, date: string, description?: string}> = []
+  try {
+    const releasesOutput = execSync('git for-each-ref --format="%(refname:short) %(creatordate:short)" refs/tags --sort=-creatordate', { encoding: 'utf8' }).trim()
+    if (releasesOutput) {
+      const releases = []
+      const lines = releasesOutput.split('\n').slice(0, 3) // Get last 3 releases
+      
+      for (const line of lines) {
+        const [version, date] = line.trim().split(' ')
+        if (version && date) {
+          // Try to get the tag message/description
+          let description = ''
+          try {
+            const tagMessage = execSync(`git tag -l --format="%(contents:subject)" ${version}`, { encoding: 'utf8' }).trim()
+            description = tagMessage || ''
+          } catch (error) {
+            // If we can't get the tag message, that's okay
+          }
+          
+          releases.push({
+            version,
+            date,
+            description: description || undefined
+          })
+        }
+      }
+      
+      recentReleases = releases
+    }
+  } catch (error) {
+    console.warn('Could not fetch recent releases:', error instanceof Error ? error.message : String(error))
+  }
+
   return {
     plugins: [react()],
     base,
@@ -50,6 +84,7 @@ export default defineConfig(() => {
     define: {
       'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
       'import.meta.env.VITE_APP_RELEASE_DATE': JSON.stringify(releaseDate),
+      'import.meta.env.VITE_APP_RECENT_RELEASES': JSON.stringify(recentReleases),
     },
     build: {
       outDir: 'dist',

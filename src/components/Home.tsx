@@ -12,6 +12,7 @@ import {
 import { getVisibleTools } from '../tools/registry';
 import { useFavorites } from '../hooks/useFavorites';
 import { getVersionInfo } from '../utils/version';
+import { getRecentReleases, formatReleaseDate, getReleaseStatus } from '../utils/releases';
 
 const getToolDescription = (toolId: string): string => {
   const descriptions: Record<string, string> = {
@@ -28,6 +29,7 @@ const Home: React.FC = () => {
   const { version: currentVersion, releaseDate } = getVersionInfo();
   const allTools = getVisibleTools();
   const { isFavorite } = useFavorites();
+  const recentReleases = getRecentReleases(3);
   
   // Show only favorited tools
   const tools = allTools.filter(tool => isFavorite(tool.id));
@@ -95,34 +97,159 @@ const Home: React.FC = () => {
       </Card>
 
       <Card elevation={1} className="status-card">
-        <H3>✅ Production Status</H3>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 20 }}>
-          <div>
-            <H4 style={{ margin: '0 0 8px 0', color: 'var(--bp4-color-text-muted)' }}>Test Coverage</H4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: 'var(--bp4-color-success)' }}>✅</span>
-              <span>98 unit tests + 53 E2E tests</span>
-            </div>
-          </div>
-          <div>
-            <H4 style={{ margin: '0 0 8px 0', color: 'var(--bp4-color-text-muted)' }}>Security</H4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: 'var(--bp4-color-success)' }}>🛡️</span>
-              <span>All vulnerabilities resolved</span>
-            </div>
-          </div>
-          <div>
-            <H4 style={{ margin: '0 0 8px 0', color: 'var(--bp4-color-text-muted)' }}>Deployment</H4>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{ color: 'var(--bp4-color-success)' }}>☁️</span>
-              <span>Automated CI/CD pipeline</span>
-            </div>
-          </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+          <H3>📦 Recent Releases</H3>
+          <Button 
+            small 
+            intent={Intent.NONE} 
+            icon="document"
+            onClick={() => window.open('https://github.com/misfosster/pxtoolbox/releases', '_blank')}
+          >
+            View All
+          </Button>
         </div>
         
-        <p>
-          The PX Toolbox is now production-ready with comprehensive testing, security compliance, 
-          and automated deployment. All core tools are fully functional and ready for team use.
+        {recentReleases.length > 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {recentReleases.map((release, index) => {
+              const isLatest = index === 0;
+              const status = getReleaseStatus(release.version, isLatest);
+              
+              // Determine release type based on version
+              const getReleaseType = (version: string) => {
+                const versionNumber = version.replace('v', '').split('.');
+                const major = parseInt(versionNumber[0]);
+                const minor = parseInt(versionNumber[1]);
+                
+                if (major > 0) return { type: 'Major', intent: Intent.DANGER, icon: 'warning-sign' };
+                if (minor > 0) return { type: 'Minor', intent: Intent.WARNING, icon: 'add' };
+                return { type: 'Patch', intent: Intent.SUCCESS, icon: 'tick' };
+              };
+              
+              const releaseType = getReleaseType(release.version);
+              
+              return (
+                <div 
+                  key={release.version}
+                  style={{ 
+                    padding: '20px',
+                    backgroundColor: status === 'current' ? 'var(--bp4-color-background-light)' : 'transparent',
+                    borderRadius: '12px',
+                    border: status === 'current' ? '2px solid var(--bp4-color-primary)' : '1px solid var(--bp4-color-border)',
+                    boxShadow: status === 'current' ? '0 4px 12px rgba(0, 0, 0, 0.1)' : 'none'
+                  }}
+                >
+                  {/* Header with version, date, and badges */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                      <Tag 
+                        intent={status === 'current' ? Intent.SUCCESS : Intent.NONE}
+                        icon={status === 'current' ? 'tick' : undefined}
+                        large
+                      >
+                        {release.version}
+                      </Tag>
+                      <Tag intent={releaseType.intent} icon={releaseType.icon} minimal>
+                        {releaseType.type}
+                      </Tag>
+                      <span className={Classes.TEXT_MUTED}>
+                        {formatReleaseDate(release.date)}
+                      </span>
+                      {status === 'current' && (
+                        <Tag intent={Intent.PRIMARY} minimal>Latest</Tag>
+                      )}
+                    </div>
+                    
+                    {/* Download/View buttons */}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button 
+                        small 
+                        intent={Intent.PRIMARY}
+                        icon="download"
+                        onClick={() => {
+                          // Open the release page where user can find the download
+                          window.open(`https://github.com/Misfosster/pxtoolbox/releases/tag/${release.version}`, '_blank');
+                        }}
+                      >
+                        Download
+                      </Button>
+                      <Button 
+                        small 
+                        intent={Intent.NONE}
+                        icon="document"
+                        onClick={() => window.open(`https://github.com/misfosster/pxtoolbox/releases/tag/${release.version}`, '_blank')}
+                      >
+                        View
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {/* Release highlights */}
+                  {release.description && (
+                    <div style={{ marginBottom: 16 }}>
+                      <H4 style={{ margin: '0 0 8px 0', color: 'var(--bp4-color-text)', fontSize: '16px' }}>
+                        What's New
+                      </H4>
+                      <div style={{ 
+                        padding: '12px 16px', 
+                        backgroundColor: 'var(--bp4-color-background)',
+                        borderRadius: '8px',
+                        border: '1px solid var(--bp4-color-border)'
+                      }}>
+                        <p style={{ margin: 0, fontSize: '14px', color: 'var(--bp4-color-text-muted)', lineHeight: '1.5' }}>
+                          {release.description}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Compatibility info */}
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    padding: '12px 16px',
+                    backgroundColor: 'var(--bp4-color-background)',
+                    borderRadius: '8px',
+                    border: '1px solid var(--bp4-color-border)'
+                  }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: 'var(--bp4-color-success)' }}>🌐</span>
+                        <span style={{ fontSize: '12px', color: 'var(--bp4-color-text-muted)' }}>Browser Compatible</span>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ color: 'var(--bp4-color-primary)' }}>📦</span>
+                        <span style={{ fontSize: '12px', color: 'var(--bp4-color-text-muted)' }}>No Dependencies</span>
+                      </div>
+                    </div>
+                    <Button 
+                      minimal 
+                      small 
+                      intent={Intent.NONE}
+                      icon="external-link"
+                      onClick={() => {
+                        // Compare to previous release, or to initial commit if this is the first release
+                        const previousRelease = index < recentReleases.length - 1 ? recentReleases[index + 1].version : 'main';
+                        window.open(`https://github.com/misfosster/pxtoolbox/compare/${previousRelease}...${release.version}`, '_blank');
+                      }}
+                    >
+                      Compare
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className={Classes.TEXT_MUTED}>
+            No release information available.
+          </p>
+        )}
+        
+        <p style={{ marginTop: 20 }}>
+          The PX Toolbox is actively maintained with regular releases and updates. 
+          All core tools are fully functional and ready for team use.
         </p>
         
         <H4>Future Enhancements:</H4>
