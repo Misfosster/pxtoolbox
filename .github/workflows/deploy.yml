@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   workflow_run:
-    workflows: ["Release"]
+    workflows: ["CI"]
     types: [completed]
   workflow_dispatch:
 
@@ -18,7 +18,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'release-')) || (github.event_name == 'workflow_dispatch') }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -26,7 +26,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
+
+      # Only deploy if this commit has a v* tag
+      - name: Require v* tag on this commit
+        if: github.event_name == 'workflow_run'
+        run: |
+          git fetch --tags --force
+          TAGS=$(git tag --points-at ${{ github.event.workflow_run.head_sha }} | grep -E '^v[0-9]' || true)
+          if [ -z "$TAGS" ]; then
+            echo "No v* tag on this commit; skipping deploy."
+            exit 0
+          fi
+          echo "Found tag(s): $TAGS"
 
       - name: Set REPO_NAME for Vite base
         run: echo "REPO_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV

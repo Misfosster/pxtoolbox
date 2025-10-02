@@ -9,38 +9,39 @@ on:
 permissions:
   contents: write
   actions: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_branch || github.ref_name }}
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    if: ${{ (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success' && startsWith(github.event.workflow_run.head_branch, 'release-')) || (github.event_name == 'workflow_dispatch' && startsWith(github.ref_name, 'release-')) }}
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') }}
 
     steps:
       # Checkout with full history (needed for git log/describe)
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.ref }}
+          ref: ${{ github.event.workflow_run.head_sha }}
           fetch-depth: 0
 
-      # Pull dist from CI when triggered via workflow_run
-      - name: List artifacts on triggering CI run
-        if: github.event_name == 'workflow_run'
+      # Determine tag for this commit
+      - name: Determine tag for this commit
+        id: tag
+        shell: bash
         run: |
-          echo "Artifacts for run ${{ github.event.workflow_run.id }}:"
-          gh api repos/${{ github.repository }}/actions/runs/${{ github.event.workflow_run.id }}/artifacts \
-            --jq '.artifacts[].name'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          git fetch --tags --force
+          TAG="$(git tag --points-at HEAD | grep -E '^v[0-9]' | head -n1)"
+          if [ -z "$TAG" ]; then
+            echo "::error::No tag (v*) found pointing at ${{ github.event.workflow_run.head_sha }}"
+            exit 1
+          fi
+          echo "TAG=$TAG" >> "$GITHUB_OUTPUT"
 
+      # Download dist from the successful CI run that triggered this release
       - name: Download dist from CI run
-        if: github.event_name == 'workflow_run'
         uses: actions/download-artifact@v4
         with:
           run-id: ${{ github.event.workflow_run.id }}
@@ -49,119 +50,52 @@ jobs:
           path: ./dist
 
       - name: Ensure dist exists
-        if: github.event_name == 'workflow_run'
         run: |
           if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
-            echo "::error::CI artifact 'dist' not found for run ${{ github.event.workflow_run.id }}."
+            echo "::error::CI artifact 'dist' not found for run ${{ github.event.workflow_run.id }}"
             exit 1
           fi
-
-      # Manual dispatch fallback: build dist
-      - name: Setup Node (manual dispatch only)
-        if: github.event_name == 'workflow_dispatch'
-        uses: actions/setup-node@v4
-        with:
-          node-version: 20
-          cache: npm
-
-      - name: Build for manual dispatch
-        if: github.event_name == 'workflow_dispatch'
-        run: |
-          npm ci
-          npm run build
-
-      # Extract version from the release-* branch name
-      - name: Extract version
-        id: version
-        shell: bash
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            VERSION="${{ github.event.workflow_run.head_branch }}"
-          else
-            VERSION="${{ github.ref_name }}"
-          fi
-          VERSION="${VERSION#release-}"
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
 
       # Create a zip from dist
       - name: Create release zip
         run: |
           cd dist
-          zip -r ../pxtoolbox-${{ steps.version.outputs.VERSION }}.zip .
+          zip -r ../pxtoolbox-${{ steps.tag.outputs.TAG }}.zip .
           cd ..
 
-      # Generate CHANGELOG.md (emits "## [vX.Y.Z]" style headings)
-      - name: Generate Changelog
+      # Generate changelog from commits between tags
+      - name: Generate changelog from commits between tags
         id: changelog
         shell: bash
         run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
-          if [ "$VERSION" = "v0.1.0" ]; then
-            {
-              echo "## [v0.1.0] - Initial Release"
-              echo
-              echo "### Added"
-              echo "- First release of PX Toolbox"
-              echo "- Diff Viewer with inline highlights"
-              echo "- JSON Formatter with validation"
-              echo "- JWT Decoder with payload hints"
-              echo "- Base64 Encoder/Decoder"
-              echo "- URL Encoder/Decoder"
-              echo "- Comprehensive test coverage (98 unit + 53 E2E tests)"
-            } > CHANGELOG.md
-          else
-            {
-              echo "## [$VERSION] - $(date +%Y-%m-%d)"
-              echo
-              echo "### Changes"
-              git log --pretty=format:"- %s" --since="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
-            } > CHANGELOG.md
-          fi
+          set -euo pipefail
+          CURRENT="${{ steps.tag.outputs.TAG }}"       # e.g. v0.1.2
+          # previous tag reachable before CURRENT; falls back to empty on first release
+          PREV="$(git describe --tags --abbrev=0 "${CURRENT}^" 2>/dev/null || true)"
 
-      # Short release README (slices current version section from changelog)
-      - name: Generate Release README
-        shell: bash
-        run: |
-          VERSION=${{ steps.version.outputs.VERSION }}
-          cat > RELEASE_README.md << 'EOF'
-          # PX Toolbox VERSION
+          {
+            echo "## [$CURRENT] - $(date +%Y-%m-%d)"
+            echo
+            if [ -z "$PREV" ]; then
+              echo "### Commits (initial release)"
+              # For initial release, show full history from root
+              ROOT="$(git rev-list --max-parents=0 HEAD | tail -1)"
+              git log --no-merges --reverse --pretty=format:"- %h %s" "${ROOT}..${CURRENT}"
+            else
+              echo "### Commits since $PREV"
+              git log --no-merges --reverse --pretty=format:"- %h %s" "${PREV}..${CURRENT}"
+            fi
+            echo
+          } > CHANGELOG.md
 
-          ## 🚀 Quick Start
-          1. **Download** the `pxtoolbox-VERSION.zip` file
-          2. **Extract** the zip
-          3. **Open** `index.html` in your browser
-
-          ## 📋 What's New in VERSION
-          EOF
-          sed -n '/^## \['"$VERSION"'\]/,/^## \[/p' CHANGELOG.md | sed '$d' >> RELEASE_README.md || echo "No changelog section found for $VERSION" >> RELEASE_README.md
-          cat >> RELEASE_README.md << 'EOF'
-
-          ## 🛠️ Available Tools
-          - Diff Viewer — inline highlights
-          - JSON Formatter — format & validate
-          - JWT Decoder — payload hints
-          - Base64 Encoder/Decoder
-          - URL Encoder/Decoder
-          EOF
-          # Templatize VERSION strings
-          sed -i "s/VERSION/$VERSION/g" RELEASE_README.md
-
-      # Prepare Pages artifact from ./dist
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
 
       # Create GitHub Release and attach assets
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.VERSION }}
-          name: Release ${{ steps.version.outputs.VERSION }}
+          tag_name: ${{ steps.tag.outputs.TAG }}
+          target_commitish: ${{ github.event.workflow_run.head_sha }}
           body_path: CHANGELOG.md
-          files: |
-            pxtoolbox-${{ steps.version.outputs.VERSION }}.zip
-            RELEASE_README.md
+          files: pxtoolbox-${{ steps.tag.outputs.TAG }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

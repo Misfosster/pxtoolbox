@@ -1,67 +1,52 @@
-# Changelog
+# v0.1.1
 
-All notable changes to this project will be documented in this file.
+Bug fixes and minor improvements.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+## Changelog
 
-## [Unreleased]
+### 🐛 Fixes
 
-### Added
-- Automated release workflow with GitHub Actions
-- Comprehensive security updates (Vite 7.1.7, Vitest 3.2.4)
-- Zero vulnerabilities (all security issues resolved)
+- `8c42840` app versioning and release date display
+- `803ca21` simplify Deploy workflow to build from source
+- `978c7c2` deploy on CI success for release branches
+- `85b93f6` repo name for Vite base
+- `ce29343` release and deployment workflows
 
-## [0.1.0] - 2025-09-23
+### ✨ Features
 
-### Added
-- **Diff Viewer**: Inline highlights with Beyond Compare-style interface
-  - Side-by-side tinting and unified preview
-  - Unicode-safe tokenization and grapheme handling
-  - Complete empty field logic for all scenarios
-  - Smart inline mode with character-level toggle
-  - Whitespace ignore toggle (line + inline)
-  - Wrap-aware numbering and gutter alignment
-  - Custom in-textbox vertical resizer
-- **JSON Formatter**: Validation and foldable tree view
-  - Auto-format on paste/type
-  - Minify/pretty toggle
-  - Error handling for invalid JSON
-  - SVG connectors in tree view
-- **JWT Decoder**: Token decoding with payload hints
-  - UTC and relative time formatting
-  - Eye toggle for hints visibility
-  - Copy respects toggle state
-- **Base64 Encoder/Decoder**: Bidirectional conversion
-  - URL-safe encoding support
-  - Whitespace and padding handling
-- **URL Encoder/Decoder**: Web-safe encoding
-  - Plus sign handling for spaces
-  - Error handling for invalid input
-- **Tools Hub**: Registry-driven navigation
-  - Sidebar with tool icons and labels
-  - Responsive design for mobile
-  - Auto-expand on tool routes
+- `f19e862` unit tests for version util
+- `11f7ef5` implement clean CI → Release → Deploy chain
+- `cdf9d81` optimized workflows with branch-based releases + artifact reuse
+- `44b0d04` optimized workflows with branch-based releases + artifact reuse
+- `06785b2` adds favorite tools functionality
+- `4cd4068` home page with tool overviews
 
-### Technical
-- **Testing**: 98 unit tests (Vitest) + 53 E2E tests (Playwright)
-- **Security**: Zero vulnerabilities, all dependencies updated
-- **Build**: Vite 7.1.7 with optimized production builds
-- **UI**: Blueprint JS components with consistent design
-- **Performance**: Optimized bundle size (~465KB gzipped)
+### 🔄 Changes
 
-### Infrastructure
-- **CI/CD**: GitHub Actions for automated testing and deployment
-- **Deployment**: GitHub Pages with automated releases
-- **Versioning**: Semantic versioning with automated changelog generation
-- **Security**: Regular dependency updates and vulnerability scanning
+- `- Add REPO_NAME environment variable for Vite base path` 
+- `- Eliminate complex artifact chain dependencies` 
+- `- Ensure reliable GitHub Pages deployment` 
+- `5a89389` Merge branch 'release-v0.1.1'
+- `- version is extracted from the branch name for artifact naming` 
+- `- deploy workflow is triggered upon successful completion of the release workflow` 
+- `- deploy workflow reuses build artifacts from release workflow (no duplicate builds)` 
+- `- changelog generation is improved to handle initial releases` 
+- `- release artifacts include changelog-based README for better user experience` 
+- `- CI workflow is streamlined with better concurrency and artifact retention` 
+- `- deploy workflow includes proper permissions and environment configuration` 
+- `- version is extracted from the branch name for artifact naming` 
+- `- deploy workflow is triggered upon successful completion of the release workflow` 
+- `- deploy workflow reuses build artifacts from release workflow (no duplicate builds)` 
+- `- changelog generation is improved to handle initial releases` 
+- `- release artifacts include changelog-based README for better user experience` 
+- `- CI workflow is streamlined with better concurrency and artifact retention` 
+- `- deploy workflow includes proper permissions and environment configuration` 
+- `version is extracted from the branch name` 
+- `deploy workflow is triggered upon successful completion of the release workflow` 
+- `changelog generation is improved to handle initial releases` 
+- `- Introduces a `useFavorites` hook to manage favorite tool IDs.` 
+- `- Updates the Home component to display only favorited tools, offering a cleaner, personalized experience.` 
+- `- Adds a toggle favorite button to each tool's shell, allowing users to easily add or remove tools from their favorites.` 
+- `- Adjusts Field component to accept ReactNode for labels, allowing custom components to be used within labels.` 
+- `includes links to view the source code and release notes (favourite/bookmark feature to be implemented)` 
 
----
-
-**Legend:**
-- `Added` for new features
-- `Changed` for changes in existing functionality
-- `Deprecated` for soon-to-be removed features
-- `Removed` for now removed features
-- `Fixed` for any bug fixes
-- `Security` for vulnerability fixes
