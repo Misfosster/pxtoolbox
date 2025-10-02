@@ -167,8 +167,8 @@ const Home: React.FC = () => {
                         intent={Intent.PRIMARY}
                         icon="download"
                         onClick={() => {
-                          // Open the release page where user can find the download
-                          window.open(`https://github.com/Misfosster/pxtoolbox/releases/tag/${release.version}`, '_blank');
+                          // Direct download link to the zip file
+                          window.open(`https://github.com/Misfosster/pxtoolbox/releases/download/${release.version}/pxtoolbox-${release.version}.zip`, '_blank');
                         }}
                       >
                         Download
