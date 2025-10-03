@@ -4,7 +4,7 @@ test.use({ ...devices['Desktop Chrome HiDPI'] });
 
 test.describe('Diff Viewer – overlay anchoring at HiDPI', () => {
   test('overlay aligns with textarea content within 3px at dpr=2', async ({ page }) => {
-    await page.goto('/tools/diff');
+    await page.goto('/#/tools/diff');
     await page.getByText('Ignore whitespace').waitFor({ state: 'visible' });
 
     await page.locator('#diff-left').fill('hello friend');

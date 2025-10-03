@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Diff Viewer – overlay + numbering', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/tools/diff');
+    await page.goto('/#/tools/diff');
     // Ensure the tool is visible; if there's a tab, adjust as needed
     await page.getByText('Ignore whitespace').waitFor({ state: 'visible' });
   });

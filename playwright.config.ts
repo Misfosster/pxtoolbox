@@ -22,6 +22,10 @@ export default defineConfig({
     command: 'npm run preview:ci',
     port: 4173,
     reuseExistingServer: !process.env.CI,
+    timeout: 120 * 1000, // 2 minutes timeout for server startup
+    env: {
+      PLAYWRIGHT_TEST: 'true',
+    },
   },
 });
 

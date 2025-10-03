@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Golden Corpus - Visual Validation', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/tools/diff');
+    await page.goto('/#/tools/diff');
     // Wait for the diff tool to be loaded
     await page.waitForSelector('#diff-left');
   });
@@ -255,7 +255,7 @@ test.describe('Golden Corpus - Visual Validation', () => {
 
 test.describe('Golden Corpus - Performance at Scale', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/tools/diff');
+    await page.goto('/#/tools/diff');
     // Wait for the diff tool to be loaded
     await page.waitForSelector('#diff-left');
   });

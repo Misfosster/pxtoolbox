@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('JWT Decoder Tool', () => {
   test('decodes a valid JWT header and payload', async ({ page }) => {
-    await page.goto('/tools/jwt');
+    await page.goto('/#/tools/jwt');
 
     // sample unsigned token (header: {"alg":"none","typ":"JWT"}, payload: {"sub":"123","name":"John"})
     const header = Buffer.from(JSON.stringify({ alg: 'none', typ: 'JWT' })).toString('base64url');
@@ -20,7 +20,7 @@ test.describe('JWT Decoder Tool', () => {
   });
 
   test('shows exp/nbf/iat helper text with UTC and relative time', async ({ page }) => {
-    await page.goto('/tools/jwt');
+    await page.goto('/#/tools/jwt');
 
     const nowSec = Math.floor(Date.now() / 1000);
     const payloadObj = {
@@ -42,7 +42,7 @@ test.describe('JWT Decoder Tool', () => {
   });
 
   test('shows error for malformed JWT', async ({ page }) => {
-    await page.goto('/tools/jwt');
+    await page.goto('/#/tools/jwt');
 
     await page.locator('#jwt-input').fill('not.a.jwt');
 
