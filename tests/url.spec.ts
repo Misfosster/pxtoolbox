@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('URL Encoder/Decoder Tool', () => {
   test('encodes text to URL-encoded on the right pane', async ({ page }) => {
-    await page.goto('/#/tools/url');
+    await page.goto('/tools/url');
 
     await page.locator('#url-input').fill('Hello, world! äø&?');
 
@@ -10,7 +10,7 @@ test.describe('URL Encoder/Decoder Tool', () => {
   });
 
   test('decodes URL-encoded (including + as space) on the left pane', async ({ page }) => {
-    await page.goto('/#/tools/url');
+    await page.goto('/tools/url');
 
     await page.locator('#url-output').fill('Hello%2C+world%21');
 
@@ -18,7 +18,7 @@ test.describe('URL Encoder/Decoder Tool', () => {
   });
 
   test('shows error for invalid URL-encoded input on the right pane', async ({ page }) => {
-    await page.goto('/#/tools/url');
+    await page.goto('/tools/url');
 
     await page.locator('#url-output').fill('%E4%A'); // malformed percent sequence
 

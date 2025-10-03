@@ -15,7 +15,7 @@ async function getStyles(page: Page, locator: ReturnType<Page['locator']>) {
 
 test.describe('Diff Viewer – overlay/preview style parity (test-first)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/#/tools/diff');
+    await page.goto('/tools/diff');
   });
 
   test('class naming parity: overlay and preview use .diff-seg.diff-add|diff-del', async ({ page }) => {

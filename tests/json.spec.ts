@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('JSON Formatter Tool', () => {
   test('auto-formats input on paste/type', async ({ page }) => {
-    await page.goto('/#/tools/json');
+    await page.goto('/tools/json');
     await page.locator('#json-input').fill('{"a":1,"b":[2,3]}');
     // Auto-collapse hides the input; expand then assert formatted value
     await page.getByTestId('toggle-text-pane').click();
@@ -11,7 +11,7 @@ test.describe('JSON Formatter Tool', () => {
   });
 
   test('formats raw JSON using the Format button', async ({ page }) => {
-    await page.goto('/#/tools/json');
+    await page.goto('/tools/json');
 
     await page.locator('#json-input').fill('{"a":1,"b":[2,3]}');
     // Expand after auto-collapse to reveal actions
@@ -22,7 +22,7 @@ test.describe('JSON Formatter Tool', () => {
   });
 
   test('minifies pretty JSON using the Minify button', async ({ page }) => {
-    await page.goto('/#/tools/json');
+    await page.goto('/tools/json');
 
     await page.locator('#json-input').fill(`{
   "count": 2,
@@ -36,7 +36,7 @@ test.describe('JSON Formatter Tool', () => {
   });
 
   test('shows error for invalid JSON', async ({ page }) => {
-    await page.goto('/#/tools/json');
+    await page.goto('/tools/json');
 
     await page.locator('#json-input').fill('{ bad json');
 

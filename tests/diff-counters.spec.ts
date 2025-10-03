@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Diff Viewer – counters and changed-only preview', () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto('/#/tools/diff');
+    await page.goto('/tools/diff');
     await page.getByText('Ignore whitespace').waitFor({ state: 'visible' });
   });
 

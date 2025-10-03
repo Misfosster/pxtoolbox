@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Diff Viewer - Empty Field Scenarios', () => {
   test('shows additions when only right side has content', async ({ page }) => {
-    await page.goto('/#/tools/diff');
+    await page.goto('/tools/diff');
 
     // Leave left empty, fill right
     await page.locator('#diff-left').fill('');
@@ -23,7 +23,7 @@ test.describe('Diff Viewer - Empty Field Scenarios', () => {
   });
 
   test('shows deletions when only left side has content', async ({ page }) => {
-    await page.goto('/#/tools/diff');
+    await page.goto('/tools/diff');
 
     // Fill left, leave right empty
     await page.locator('#diff-left').fill('old line 1\nold line 2\nold line 3');
@@ -44,7 +44,7 @@ test.describe('Diff Viewer - Empty Field Scenarios', () => {
   });
 
   test('shows nothing when both sides are empty', async ({ page }) => {
-    await page.goto('/#/tools/diff');
+    await page.goto('/tools/diff');
 
     // Both empty
     await page.locator('#diff-left').fill('');
@@ -58,7 +58,7 @@ test.describe('Diff Viewer - Empty Field Scenarios', () => {
   });
 
   test('normal diff when both sides have content', async ({ page }) => {
-    await page.goto('/#/tools/diff');
+    await page.goto('/tools/diff');
 
     await page.locator('#diff-left').fill('line1\nline2');
     await page.locator('#diff-right').fill('line1\nlineX');

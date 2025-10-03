@@ -17,7 +17,7 @@ test.describe('Favorites System', () => {
 
   test('should add tool to favorites and show on homepage', async ({ page }) => {
     // Go to Base64 tool
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
     
     // Click the star button to favorite
     const starButton = page.locator('[data-testid="favorite-star"]').first();
@@ -33,7 +33,7 @@ test.describe('Favorites System', () => {
 
   test('should remove tool from favorites', async ({ page }) => {
     // First add a favorite
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
     const starButton = page.locator('[data-testid="favorite-star"]').first();
     await starButton.click();
     
@@ -42,7 +42,7 @@ test.describe('Favorites System', () => {
     await expect(page.locator('.tool-preview-card:has-text("Base64 Encoder/Decoder")')).toBeVisible();
     
     // Go back to tool and unfavorite
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
     await starButton.click();
     
     // Go to homepage - should be empty again
@@ -52,10 +52,10 @@ test.describe('Favorites System', () => {
 
   test('should persist favorites across page navigation', async ({ page }) => {
     // Add multiple favorites
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
     await page.locator('[data-testid="favorite-star"]').first().click();
     
-    await page.goto('/#/tools/jwt');
+    await page.goto('/tools/jwt');
     await page.locator('[data-testid="favorite-star"]').first().click();
     
     // Go to homepage
@@ -67,7 +67,7 @@ test.describe('Favorites System', () => {
     await expect(page.locator('text=2 favorites')).toBeVisible();
     
     // Navigate away and back
-    await page.goto('/#/tools/url');
+    await page.goto('/tools/url');
     await page.goto('/');
     
     // Favorites should still be there
@@ -77,7 +77,7 @@ test.describe('Favorites System', () => {
 
   test('should show correct star states on tool pages', async ({ page }) => {
     // Initially unfavorited
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
     const starButton = page.locator('[data-testid="favorite-star"]').first();
     
     // Check if the button has the correct icon (Blueprint might use different attributes)
@@ -90,8 +90,8 @@ test.describe('Favorites System', () => {
     await expect(filledIconElement).toBeVisible();
     
     // Navigate away and back
-    await page.goto('/#/tools/jwt');
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/jwt');
+    await page.goto('/tools/base64');
     
     // Should still be favorited
     const stillFilledIconElement = starButton.locator('[data-icon="star"]');
@@ -109,7 +109,7 @@ test.describe('Favorites System', () => {
     
     // Favorite each tool
     for (const tool of tools) {
-      await page.goto(`/#/tools/${tool.path}`);
+      await page.goto(`/tools/${tool.path}`);
       await page.locator('[data-testid="favorite-star"]').first().click();
     }
     
@@ -126,10 +126,10 @@ test.describe('Favorites System', () => {
 
   test('should maintain favorites after browser refresh', async ({ page }) => {
     // Add favorites
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
     await page.locator('[data-testid="favorite-star"]').first().click();
     
-    await page.goto('/#/tools/jwt');
+    await page.goto('/tools/jwt');
     await page.locator('[data-testid="favorite-star"]').first().click();
     
     // Refresh the page

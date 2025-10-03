@@ -81,6 +81,11 @@ export default defineConfig(() => {
     server: {
       port: 5174,
     },
+    preview: {
+      port: 4173,
+      // Enable SPA routing for preview server (needed for BrowserRouter in tests)
+      historyApiFallback: true,
+    },
     define: {
       'import.meta.env.VITE_APP_VERSION': JSON.stringify(appVersion),
       'import.meta.env.VITE_APP_RELEASE_DATE': JSON.stringify(releaseDate),

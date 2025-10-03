@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Base64 Tool', () => {
   test('encodes text to Base64 on the right pane', async ({ page }) => {
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
 
     const textArea = page.locator('#b64-input');
     await textArea.fill('Hello, Px!');
@@ -12,7 +12,7 @@ test.describe('Base64 Tool', () => {
   });
 
   test('decodes Base64 (url/no padding/whitespace) on the left pane', async ({ page }) => {
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
 
     // "Hello-World_!" base64url (no padding) is "SGVsbG8tV29ybGRfIQ"
     const messy = 'SGV s bG8tV2 9y bGRfIQ';
@@ -22,7 +22,7 @@ test.describe('Base64 Tool', () => {
   });
 
   test('shows error for invalid base64 when typing on the right pane', async ({ page }) => {
-    await page.goto('/#/tools/base64');
+    await page.goto('/tools/base64');
 
     await page.locator('#b64-output').fill('not_base64!!');
 
