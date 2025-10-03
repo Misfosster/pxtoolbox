@@ -41,20 +41,21 @@ jobs:
           fi
           echo "Found tag(s): $TAGS"
 
-      - name: Set REPO_NAME for Vite base
-        run: echo "REPO_NAME=${{ github.event.repository.name }}" >> $GITHUB_ENV
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - name: Download dist from CI run
+        uses: actions/download-artifact@v4
         with:
-          node-version: 20
-          cache: npm
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: dist
+          path: ./dist
 
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
+      - name: Ensure dist exists
+        run: |
+          if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
+            echo "::error::CI artifact 'dist' not found for run ${{ github.event.workflow_run.id }}"
+            exit 1
+          fi
+          echo "Using dist artifacts from CI run with correct base path"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
