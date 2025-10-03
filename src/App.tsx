@@ -11,7 +11,7 @@ function App() {
   // Use HashRouter for tests, BrowserRouter for production
   // Check if we're in a test environment by looking for Playwright-specific globals
   const isTestEnvironment = typeof window !== 'undefined' && 
-    (window.location.hostname === 'localhost' && window.location.port === '4173');
+    (window as any).__PLAYWRIGHT_TEST__;
   const RouterComponent = isTestEnvironment ? TestRouter : Router;
   
   return (
