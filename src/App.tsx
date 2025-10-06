@@ -16,10 +16,17 @@ function App() {
     window.location?.port === '4173' &&
     (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const RouterComponent = isTestEnvironment ? TestRouter : Router;
+
+  // Ensure routes work correctly when the app is served from a sub-path
+  // (e.g. GitHub Pages project sites). Vite exposes the configured base via
+  // import.meta.env.BASE_URL, which includes a trailing slash. BrowserRouter
+  // expects the basename without the trailing slash, while HashRouter ignores
+  // it, so we trim it to support both routers.
+  const baseName = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
   
   return (
     <div className={Classes.DARK}>
-      <RouterComponent>
+      <RouterComponent basename={baseName}>
         <Layout>
           <Routes>
             <Route path="/" element={<Home />} />
