@@ -81,16 +81,6 @@ const Home: React.FC = () => {
               <Link 
                 to={`/tools/${tool.path}`} 
                 style={{ textDecoration: 'none' }}
-                onClick={() => {
-                  // Debug logging for production troubleshooting
-                  console.log('Favorite Tool Link:', {
-                    toolId: tool.id,
-                    toolPath: tool.path,
-                    linkTo: `/tools/${tool.path}`,
-                    currentPath: window.location.pathname,
-                    baseURL: import.meta.env.BASE_URL
-                  });
-                }}
               >
                 <Button 
                   small 

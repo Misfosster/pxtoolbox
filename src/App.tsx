@@ -24,17 +24,6 @@ function App() {
   // it, so we trim it to support both routers.
   const baseName = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
   
-  // Debug logging for production troubleshooting
-  if (typeof window !== 'undefined' && !isTestEnvironment) {
-    console.log('Router Debug:', {
-      baseURL: import.meta.env.BASE_URL,
-      baseName,
-      isTestEnvironment,
-      currentPath: window.location.pathname,
-      routerProps: isTestEnvironment ? {} : { basename: baseName }
-    });
-  }
-  
   // HashRouter ignores basename; only pass basename when using BrowserRouter
   const routerProps = isTestEnvironment ? {} : { basename: baseName };
   
