@@ -49,27 +49,6 @@ jobs:
           name: dist
           path: ./dist
 
-      - name: Extract dist artifact
-        shell: bash
-        run: |
-          set -euxo pipefail
-          ARCHIVE=$(find dist -maxdepth 1 -type f -name '*.tar' | head -n 1 || true)
-          if [ -n "$ARCHIVE" ]; then
-            echo "Extracting dist artifact archive: $ARCHIVE"
-            tar -xf "$ARCHIVE" -C dist
-            rm "$ARCHIVE"
-          else
-            echo "No tar archive found. Assuming artifact already extracted."
-          fi
-
-          if [ -d dist/dist ]; then
-            echo "Flattening nested dist directory produced by artifact extraction"
-            shopt -s dotglob
-            mv dist/dist/* dist/
-            shopt -u dotglob
-            rmdir dist/dist
-          fi
-
       - name: Validate dist contents
         run: |
           if [ ! -d dist ] || [ -z "$(ls -A dist)" ]; then
@@ -77,11 +56,11 @@ jobs:
             exit 1
           fi
           if [ ! -f dist/index.html ]; then
-            echo "::error::dist/index.html missing after artifact extraction"
+            echo "::error::dist/index.html missing"
             ls -R dist
             exit 1
           fi
-          echo "dist artifact extracted successfully with correct base path"
+          echo "dist artifact ready for deployment"
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

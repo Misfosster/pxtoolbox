@@ -23,10 +23,12 @@ function App() {
   // expects the basename without the trailing slash, while HashRouter ignores
   // it, so we trim it to support both routers.
   const baseName = (import.meta.env.BASE_URL ?? '/').replace(/\/$/, '');
+  // HashRouter ignores basename; only pass basename when using BrowserRouter
+  const routerProps = isTestEnvironment ? {} : { basename: baseName };
   
   return (
     <div className={Classes.DARK}>
-      <RouterComponent basename={baseName}>
+      <RouterComponent {...(routerProps as any)}>
         <Layout>
           <Routes>
             <Route path="/" element={<Home />} />
