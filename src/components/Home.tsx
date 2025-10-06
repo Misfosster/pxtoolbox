@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import { 
   Card, 
   H1, 
@@ -77,13 +78,14 @@ const Home: React.FC = () => {
               <p style={{ margin: '8px 0', fontSize: '14px', color: 'var(--bp4-color-text-muted)' }}>
                 {getToolDescription(tool.id)}
               </p>
-              <Button 
-                small 
-                intent={Intent.PRIMARY}
-                onClick={() => window.location.href = `/tools/${tool.path}`}
-              >
-                Open Tool
-              </Button>
+              <Link to={`/tools/${tool.path}`} style={{ textDecoration: 'none' }}>
+                <Button 
+                  small 
+                  intent={Intent.PRIMARY}
+                >
+                  Open Tool
+                </Button>
+              </Link>
             </Card>
           ))}
         </div>
