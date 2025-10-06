@@ -8,10 +8,13 @@ import ToolsHub from './components/ToolsHub';
 import { toolsRegistry } from './tools/registry';
 
 function App() {
-  // Use HashRouter for tests, BrowserRouter for production
-  // Check if we're in a test environment by looking for Playwright-specific globals
-  const isTestEnvironment = typeof window !== 'undefined' && 
-    (window as any).__PLAYWRIGHT_TEST__;
+  // Use HashRouter for tests running against the Vite preview server on port 4173.
+  // Everywhere else (development, production, etc.) should use BrowserRouter so that
+  // we get clean URLs that match the deployed GitHub Pages site structure.
+  const isTestEnvironment =
+    typeof window !== 'undefined' &&
+    window.location?.port === '4173' &&
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
   const RouterComponent = isTestEnvironment ? TestRouter : Router;
   
   return (
