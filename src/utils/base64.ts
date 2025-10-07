@@ -10,17 +10,28 @@ export function encodeToBase64(input: string): string {
 	return btoa(binary);
 }
 
+function stripDataUrlPrefix(raw: string): string {
+	const prefix = /^data:.*?;base64,/i;
+	return prefix.test(raw) ? raw.replace(prefix, '') : raw;
+}
+
+/** Normalizes Base64:
+ * - trim
+ * - strip `data:*;base64,` if present
+ * - remove whitespace
+ * - convert Base64URL (-, _) → (+, /)
+ * - fix padding (length % 4 === 0), throw if remainder === 1
+ */
 export function normalizeBase64Input(raw: string): string {
-	let s = raw.replace(/\s+/g, '');
-	s = s.replace(/-/g, '+').replace(/_/g, '/');
-	const remainder = s.length % 4;
-	if (remainder === 1) {
-		throw new Error('Invalid Base64 length');
-	} else if (remainder === 2) {
-		s += '==';
-	} else if (remainder === 3) {
-		s += '=';
-	}
+	let s = raw.trim();
+	s = stripDataUrlPrefix(s);
+	s = s.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+
+	const rem = s.length % 4;
+	if (rem === 1) throw new Error('Invalid Base64 length');
+	if (rem === 2) s += '==';
+	else if (rem === 3) s += '=';
+
 	return s;
 }
 
