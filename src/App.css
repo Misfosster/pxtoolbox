@@ -20,7 +20,7 @@ html, body {
 /* Layout: vertical sidebar on the left */
 .app-layout {
   display: grid;
-  grid-template-columns: 260px 1fr;
+  grid-template-columns: 240px 1fr;
   min-height: 100vh;
 }
 
@@ -102,9 +102,8 @@ textarea.bp5-input:focus:not(:focus-visible) {
 }
 
 .main-container {
+  /* allow tools to use entire width; no max-width constraint */
   padding: 20px;
-  /* allow tools to use entire width; keep a gentle max on ultra-wide */
-  max-width: 1600px;
   margin: 0 auto;
 }
 
@@ -136,18 +135,22 @@ textarea.bp5-input:focus:not(:focus-visible) {
 .tool-container {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+  min-height: calc(100vh - 32px); /* Use full height minus padding */
 }
 
 .tool-header {
-  padding: 20px;
+  padding: 16px 20px;
   text-align: center;
+  flex-shrink: 0; /* Prevent header from shrinking */
 }
 
 .tool-content {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 12px;
+  flex: 1; /* Allow content to grow and fill available space */
+  min-height: 0; /* Allow flex children to shrink */
 }
 
 /* Force resizable cards to use CSS Grid for precise control */
@@ -159,6 +162,7 @@ textarea.bp5-input:focus:not(:focus-visible) {
   resize: none !important; /* disable native */
   position: relative;
   padding-bottom: 8px !important; /* tighter bottom padding */
+  min-height: 200px; /* Ensure minimum usable height */
 }
 
 /* Variant for cards that include a header at the top (e.g., JWT Decoded) */
@@ -277,15 +281,36 @@ textarea.bp5-input:focus:not(:focus-visible) {
 }
 
 .tool-section {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  flex: 1; /* Allow sections to grow and fill available space */
+  min-height: 0; /* Allow flex children to shrink */
 }
 
 .tool-input, .tool-output {
-  margin-bottom: 15px;
+  margin-bottom: 12px;
 }
 
 .copy-button {
   margin-top: 10px;
+}
+
+/* Responsive breakpoints for better space utilization */
+@media (max-width: 1200px) {
+  .app-layout {
+    grid-template-columns: 220px 1fr;
+  }
+  .main-container {
+    max-width: none; /* Remove max-width constraint on smaller screens */
+  }
+}
+
+@media (max-width: 992px) {
+  .app-layout {
+    grid-template-columns: 200px 1fr;
+  }
+  .main-container {
+    padding: 12px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -298,7 +323,7 @@ textarea.bp5-input:focus:not(:focus-visible) {
     z-index: 20; /* ensure sidebar/header stays above in-content overlays on mobile */
   }
   .main-container {
-    padding: 10px;
+    padding: 8px;
   }
   
   .welcome-card {
@@ -306,6 +331,16 @@ textarea.bp5-input:focus:not(:focus-visible) {
   }
   
   .tool-header {
-    padding: 15px;
+    padding: 12px 16px;
+  }
+  
+  .tool-container {
+    min-height: calc(100vh - 16px); /* Adjust for smaller padding */
+  }
+}
+
+@media (min-width: 1920px) {
+  .main-container {
+    max-width: 2000px; /* Allow even wider content on ultra-wide screens */
   }
 }

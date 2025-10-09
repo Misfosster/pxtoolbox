@@ -39,9 +39,9 @@ const ToolShell: React.FC<ToolShellProps> = ({
 
 	return (
 		<div className={containerClassName} style={style}>
-			<Card elevation={2} className="tool-header" style={{ display: 'flex', gap: 8, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+			<Card elevation={2} className="tool-header" style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px' }}>
 				<div style={{ flex: '1 1 auto', textAlign: 'center' }}>
-					<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
+					<div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: description ? 4 : 0 }}>
 						{toolId && (
 						<Button
 							minimal
@@ -54,10 +54,10 @@ const ToolShell: React.FC<ToolShellProps> = ({
 							data-testid="favorite-star"
 						/>
 						)}
-						<H3 style={{ marginTop: 0, marginBottom: 0 }}>{title}</H3>
+						<H3 style={{ marginTop: 0, marginBottom: 0, fontSize: '1.4rem' }}>{title}</H3>
 					</div>
 					{description && (
-						<p className={Classes.TEXT_MUTED} style={{ margin: 0 }}>{description}</p>
+						<p className={Classes.TEXT_MUTED} style={{ margin: 0, fontSize: '0.9rem' }}>{description}</p>
 					)}
 				</div>
 				{actions && (
