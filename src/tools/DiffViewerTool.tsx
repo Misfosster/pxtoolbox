@@ -9,6 +9,7 @@ import { alignLines, splitLinesNoTrailingEmpty } from '../utils/diff/line';
 import InlineTokenOverlay from '../components/InlineTokenOverlay';
 import { mergedSegments, type DiffSeg } from '../utils/diff/inline';
 import { useGutter } from '../hooks/useGutter';
+import { useWorkspaceWidth } from '../hooks/useWorkspaceWidth';
 
 const DiffViewerTool: React.FC = () => {
   const [leftText, setLeftText] = useState<string>('');
@@ -58,6 +59,51 @@ const DiffViewerTool: React.FC = () => {
     const id = setTimeout(() => setDebCharInline(charInline), 120);
     return () => clearTimeout(id);
   }, [charInline]);
+  const setWorkspaceWidth = useWorkspaceWidth();
+  const widthModeRef = useRef<'default' | 'full'>('default');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const areas = [leftRef.current, rightRef.current].filter(
+      (el): el is HTMLTextAreaElement => Boolean(el),
+    );
+
+    if (!areas.length) {
+      return;
+    }
+
+    const update = () => {
+      const container = document.querySelector('.content-container') as HTMLElement | null;
+      const containerWidth = container?.clientWidth ?? window.innerWidth;
+      if (!containerWidth) {
+        return;
+      }
+
+      const defaultWidth = containerWidth * 0.75;
+      const threshold = defaultWidth - 32;
+      const needsFull = containerWidth >= 900 && areas.some((el) => el.getBoundingClientRect().width > threshold);
+      const nextMode: 'default' | 'full' = needsFull ? 'full' : 'default';
+      if (nextMode !== widthModeRef.current) {
+        widthModeRef.current = nextMode;
+        setWorkspaceWidth(nextMode);
+      }
+    };
+
+    const ro = new ResizeObserver(update);
+    areas.forEach((el) => ro.observe(el));
+    window.addEventListener('resize', update);
+    update();
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', update);
+      widthModeRef.current = 'default';
+      setWorkspaceWidth('default');
+    };
+  }, [setWorkspaceWidth]);
 
   // Normalize EOLs (debounced for heavy diff)
   const leftNorm = useMemo(() => normalizeEOL(debLeft), [debLeft]);
@@ -194,7 +240,7 @@ const DiffViewerTool: React.FC = () => {
                   minRows={leftCollapsed ? 3 : MIN_ROWS}
                   maxRows={leftCollapsed ? 6 : undefined}
                   autosize={false}
-                  resizable="none"
+                  resizable="horizontal"
                   spellCheck={false}
                   style={{
                     paddingLeft: GUTTER_WIDTH_PX + CONTENT_GAP_PX,
@@ -316,7 +362,7 @@ const DiffViewerTool: React.FC = () => {
                   minRows={rightCollapsed ? 3 : MIN_ROWS}
                   maxRows={rightCollapsed ? 6 : undefined}
                   autosize={false}
-                  resizable="none"
+                  resizable="horizontal"
                   spellCheck={false}
                   style={{
                     paddingLeft: GUTTER_WIDTH_PX + CONTENT_GAP_PX,
@@ -589,5 +635,3 @@ const DiffViewerTool: React.FC = () => {
 };
 
 export default DiffViewerTool;
-
-

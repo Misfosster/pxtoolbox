@@ -20,8 +20,9 @@ html, body {
 /* Layout: vertical sidebar on the left */
 .app-layout {
   display: grid;
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: 240px minmax(0, 1fr);
   min-height: 100vh;
+  width: 100%;
 }
 
 .sidebar {
@@ -52,6 +53,32 @@ html, body {
 
 .content-container {
   overflow: auto;
+  min-width: 0;
+}
+
+.content-width-wrapper {
+  width: 100%;
+  max-width: 75%;
+  margin-left: 20px;
+  margin-right: auto;
+  padding: 12px 24px 32px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  transition: max-width 0.25s ease;
+}
+
+.content-width-wrapper--full {
+  max-width: 100%;
+  margin-right: 24px;
+}
+
+@media (max-width: 1024px) {
+  .content-width-wrapper {
+    max-width: 100%;
+    margin: 0;
+    padding: 12px 16px 24px;
+  }
 }
 
 /* Improve menu item spacing and colors */
@@ -102,9 +129,12 @@ textarea.bp5-input:focus:not(:focus-visible) {
 }
 
 .main-container {
-  /* allow tools to use entire width; no max-width constraint */
+  /* wrapper limits default width; keep content capable of full expansion */
   padding: 20px;
-  margin: 0 auto;
+  margin: 0;
+  width: 100%;
+  max-width: none;
+  box-sizing: border-box;
 }
 
 .home-container {
@@ -341,6 +371,6 @@ textarea.bp5-input:focus:not(:focus-visible) {
 
 @media (min-width: 1920px) {
   .main-container {
-    max-width: 2000px; /* Allow even wider content on ultra-wide screens */
+    padding: 24px;
   }
 }

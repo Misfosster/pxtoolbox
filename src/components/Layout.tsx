@@ -8,6 +8,8 @@ import {
 } from '@blueprintjs/core';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { getVisibleTools } from '../tools/registry';
+import { WorkspaceWidthProvider } from '../contexts/WorkspaceWidthContext';
+import type { WorkspaceWidthMode } from '../contexts/WorkspaceWidthContext';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -18,10 +20,25 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const { pathname } = useLocation();
   const isToolsRoute = useMemo(() => pathname.startsWith('/tools'), [pathname]);
   const [toolsOpen, setToolsOpen] = useState<boolean>(true);
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceWidthMode>('default');
 
   useEffect(() => {
     if (isToolsRoute) setToolsOpen(true);
   }, [isToolsRoute]);
+
+  useEffect(() => {
+    setWorkspaceMode('default');
+  }, [pathname]);
+
+  const widthWrapperClassName = [
+    'content-width-wrapper',
+    workspaceMode === 'full' ? 'content-width-wrapper--full' : undefined,
+  ].filter(Boolean).join(' ');
+
+  const providerValue = useMemo(() => ({
+    mode: workspaceMode,
+    setMode: setWorkspaceMode,
+  }), [workspaceMode]);
 
   return (
     <div className="app-layout">
@@ -68,8 +85,12 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </aside>
 
       <main className="content-container">
-        <div className="main-container">
-          {children}
+        <div className={widthWrapperClassName}>
+          <WorkspaceWidthProvider value={providerValue}>
+            <div className="main-container">
+              {children}
+            </div>
+          </WorkspaceWidthProvider>
         </div>
       </main>
     </div>
