@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Step } from '../utils/diff/line';
 
@@ -17,6 +17,9 @@ interface PaneNavigation {
 	goNextChange: () => boolean;
 	goPrevChange: () => boolean;
 	hasChanges: boolean;
+	changeIndex: number;
+	totalChanges: number;
+	lineIndex: number | null;
 }
 
 export interface DiffNavigationResult {
@@ -41,8 +44,10 @@ function computeChangeIndices(steps: Step[], side: PaneSide): number[] {
 	return indices;
 }
 
-function getLineTop(textarea: HTMLTextAreaElement, lines: string[], targetIndex: number): number {
-	if (targetIndex < 0) return 0;
+type LineMetrics = { top: number; lineHeight: number };
+
+function getLineMetrics(textarea: HTMLTextAreaElement, lines: string[], targetIndex: number): LineMetrics | null {
+	if (targetIndex < 0) return null;
 	const computed = window.getComputedStyle(textarea);
 	const paddingTop = parseFloat(computed.paddingTop || '0');
 	const paddingLeft = parseFloat(computed.paddingLeft || '0');
@@ -73,7 +78,7 @@ function getLineTop(textarea: HTMLTextAreaElement, lines: string[], targetIndex:
 		top += mirror.scrollHeight;
 	}
 	document.body.removeChild(mirror);
-	return top + paddingTop;
+	return { top: top + paddingTop, lineHeight };
 }
 
 function focusWithoutScroll(element: HTMLTextAreaElement) {
@@ -90,17 +95,25 @@ export function useDiffNavigation({
 	rightLines,
 	leftRef,
 	rightRef,
-	scrollOffset = 24,
+	scrollOffset = 0,
 }: DiffNavigationParams): DiffNavigationResult {
 	const leftChanges = useMemo(() => computeChangeIndices(steps, 'left'), [steps]);
 	const rightChanges = useMemo(() => computeChangeIndices(steps, 'right'), [steps]);
 
 	const leftIndexRef = useRef<number>(-1);
 	const rightIndexRef = useRef<number>(-1);
+	const [leftCurrentIndex, setLeftCurrentIndex] = useState<number>(0);
+	const [rightCurrentIndex, setRightCurrentIndex] = useState<number>(0);
+	const [leftLineIndex, setLeftLineIndex] = useState<number | null>(null);
+	const [rightLineIndex, setRightLineIndex] = useState<number | null>(null);
 
 	useEffect(() => {
 		leftIndexRef.current = -1;
 		rightIndexRef.current = -1;
+		setLeftCurrentIndex(0);
+		setRightCurrentIndex(0);
+		setLeftLineIndex(null);
+		setRightLineIndex(null);
 	}, [steps]);
 
 	const scrollToChange = useCallback(
@@ -136,13 +149,27 @@ export function useDiffNavigation({
 
 			indexRef.current = nextIndex;
 			const lineIndex = changes[nextIndex];
-			const top = getLineTop(textarea, lines, lineIndex);
+			const metrics = getLineMetrics(textarea, lines, lineIndex);
+			if (!metrics) return false;
+			const { top, lineHeight } = metrics;
 			focusWithoutScroll(textarea);
-			const targetTop = Math.max(0, top - scrollOffset);
+			const viewportHeight = textarea.clientHeight;
+			const maxScroll = Math.max(0, textarea.scrollHeight - viewportHeight);
+			const centeredTop = top - viewportHeight / 2 + lineHeight / 2;
+			const adjustedTop = centeredTop - scrollOffset;
+			const targetTop = Math.max(0, Math.min(maxScroll, adjustedTop));
 
 			requestAnimationFrame(() => {
 				textarea.scrollTo({ top: targetTop, behavior: 'smooth' });
 			});
+
+			if (isLeft) {
+				setLeftCurrentIndex(nextIndex + 1);
+				setLeftLineIndex(lineIndex);
+			} else {
+				setRightCurrentIndex(nextIndex + 1);
+				setRightLineIndex(lineIndex);
+			}
 
 			return true;
 		},
@@ -157,6 +184,10 @@ export function useDiffNavigation({
 	const reset = useCallback(() => {
 		leftIndexRef.current = -1;
 		rightIndexRef.current = -1;
+		setLeftCurrentIndex(0);
+		setRightCurrentIndex(0);
+		setLeftLineIndex(null);
+		setRightLineIndex(null);
 	}, []);
 
 	return {
@@ -164,11 +195,17 @@ export function useDiffNavigation({
 			goNextChange: goNextLeft,
 			goPrevChange: goPrevLeft,
 			hasChanges: leftChanges.length > 0,
+			changeIndex: leftCurrentIndex,
+			totalChanges: leftChanges.length,
+			lineIndex: leftLineIndex,
 		},
 		right: {
 			goNextChange: goNextRight,
 			goPrevChange: goPrevRight,
 			hasChanges: rightChanges.length > 0,
+			changeIndex: rightCurrentIndex,
+			totalChanges: rightChanges.length,
+			lineIndex: rightLineIndex,
 		},
 		reset,
 	};

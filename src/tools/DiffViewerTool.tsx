@@ -1,5 +1,5 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Switch, Tooltip } from '@blueprintjs/core';
+﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Button, Card, Switch } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
 import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
 import { normalizeEOL } from '../utils/diff/normalize';
@@ -43,6 +43,10 @@ const DiffViewerTool: React.FC = () => {
   const [rightScrollTop, setRightScrollTop] = useState<number>(0);
   const [leftHeight, setLeftHeight] = useState<number>(140);
   const [rightHeight, setRightHeight] = useState<number>(140);
+  const [leftHighlightLine, setLeftHighlightLine] = useState<number | null>(null);
+  const [rightHighlightLine, setRightHighlightLine] = useState<number | null>(null);
+  const leftHighlightTimeoutRef = useRef<number | null>(null);
+  const rightHighlightTimeoutRef = useRef<number | null>(null);
   // Debounced inputs to avoid thrashing
   const [debLeft, setDebLeft] = useState<string>('');
   const [debRight, setDebRight] = useState<string>('');
@@ -168,49 +172,100 @@ const DiffViewerTool: React.FC = () => {
     goNextChange: goNextLeft,
     goPrevChange: goPrevLeft,
     hasChanges: leftHasChanges,
+    changeIndex: leftChangeIndex,
+    totalChanges: leftTotalChanges,
+    lineIndex: leftLineIndex,
   } = leftNav;
   const {
     goNextChange: goNextRight,
     goPrevChange: goPrevRight,
     hasChanges: rightHasChanges,
+    changeIndex: rightChangeIndex,
+    totalChanges: rightTotalChanges,
+    lineIndex: rightLineIndex,
   } = rightNav;
   const navigationAvailable = leftHasChanges || rightHasChanges;
 
-  const handleGoNext = useCallback(() => {
-    const primary =
-      activePane === 'right'
-        ? { hasChanges: rightHasChanges, go: goNextRight }
-        : { hasChanges: leftHasChanges, go: goNextLeft };
-    const secondary =
-      activePane === 'right'
-        ? { hasChanges: leftHasChanges, go: goNextLeft }
-        : { hasChanges: rightHasChanges, go: goNextRight };
+  useEffect(() => {
+    if (leftLineIndex != null && leftLineIndex >= 0) {
+      setLeftHighlightLine(leftLineIndex);
+      if (leftHighlightTimeoutRef.current != null) {
+        window.clearTimeout(leftHighlightTimeoutRef.current);
+      }
+      leftHighlightTimeoutRef.current = window.setTimeout(() => {
+        setLeftHighlightLine(null);
+        leftHighlightTimeoutRef.current = null;
+      }, 700);
+    } else {
+      setLeftHighlightLine(null);
+    }
+  }, [leftLineIndex]);
 
-    if (primary.hasChanges && primary.go()) {
-      return;
+  useEffect(() => {
+    if (rightLineIndex != null && rightLineIndex >= 0) {
+      setRightHighlightLine(rightLineIndex);
+      if (rightHighlightTimeoutRef.current != null) {
+        window.clearTimeout(rightHighlightTimeoutRef.current);
+      }
+      rightHighlightTimeoutRef.current = window.setTimeout(() => {
+        setRightHighlightLine(null);
+        rightHighlightTimeoutRef.current = null;
+      }, 700);
+    } else {
+      setRightHighlightLine(null);
     }
-    if (secondary.hasChanges) {
-      secondary.go();
-    }
-  }, [activePane, goNextLeft, goNextRight, leftHasChanges, rightHasChanges]);
+  }, [rightLineIndex]);
+
+  useEffect(() => {
+    return () => {
+      if (leftHighlightTimeoutRef.current != null) {
+        window.clearTimeout(leftHighlightTimeoutRef.current);
+      }
+      if (rightHighlightTimeoutRef.current != null) {
+        window.clearTimeout(rightHighlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const navigate = useCallback(
+    (side: 'left' | 'right', direction: 'next' | 'prev', allowFallback = false) => {
+      const attempt = (target: 'left' | 'right') => {
+        setActivePane(target);
+        if (target === 'left') {
+          return direction === 'next' ? goNextLeft() : goPrevLeft();
+        }
+        return direction === 'next' ? goNextRight() : goPrevRight();
+      };
+
+      const primaryHasChanges = side === 'left' ? leftHasChanges : rightHasChanges;
+      let moved = false;
+
+      if (primaryHasChanges) {
+        moved = attempt(side);
+      } else {
+        setActivePane(side);
+      }
+
+      if (!moved && allowFallback) {
+        const fallbackSide = side === 'left' ? 'right' : 'left';
+        const fallbackHasChanges = fallbackSide === 'left' ? leftHasChanges : rightHasChanges;
+        if (fallbackHasChanges) {
+          moved = attempt(fallbackSide);
+        }
+      }
+
+      return moved;
+    },
+    [goNextLeft, goPrevLeft, goNextRight, goPrevRight, leftHasChanges, rightHasChanges],
+  );
+
+  const handleGoNext = useCallback(() => {
+    navigate(activePane, 'next', true);
+  }, [activePane, navigate]);
 
   const handleGoPrev = useCallback(() => {
-    const primary =
-      activePane === 'right'
-        ? { hasChanges: rightHasChanges, go: goPrevRight }
-        : { hasChanges: leftHasChanges, go: goPrevLeft };
-    const secondary =
-      activePane === 'right'
-        ? { hasChanges: leftHasChanges, go: goPrevLeft }
-        : { hasChanges: rightHasChanges, go: goPrevRight };
-
-    if (primary.hasChanges && primary.go()) {
-      return;
-    }
-    if (secondary.hasChanges) {
-      secondary.go();
-    }
-  }, [activePane, goPrevLeft, goPrevRight, leftHasChanges, rightHasChanges]);
+    navigate(activePane, 'prev', true);
+  }, [activePane, navigate]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -233,50 +288,11 @@ const DiffViewerTool: React.FC = () => {
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [handleGoNext, handleGoPrev, navigationAvailable]);
 
-  const headerActions = (
-    <>
-      <Tooltip content="Previous change (Alt+Up)" position="bottom">
-        <Button
-          large
-          outlined
-          icon="arrow-up"
-          aria-label="Previous change"
-          title="Previous change (Alt+Up)"
-          onClick={handleGoPrev}
-          disabled={!navigationAvailable}
-          style={{ minWidth: 44, height: 44, padding: 0 }}
-          data-testid="diff-nav-prev"
-        />
-      </Tooltip>
-      <Tooltip content="Next change (Alt+Down)" position="bottom">
-        <Button
-          large
-          outlined
-          icon="arrow-down"
-          aria-label="Next change"
-          title="Next change (Alt+Down)"
-          onClick={handleGoNext}
-          disabled={!navigationAvailable}
-          style={{ minWidth: 44, height: 44, padding: 0 }}
-          data-testid="diff-nav-next"
-        />
-      </Tooltip>
-      <Switch
-        checked={showUnifiedPreview}
-        onChange={(event) => setShowUnifiedPreview((event.currentTarget as HTMLInputElement).checked)}
-        aria-label="Show unified preview"
-        label="Show unified preview"
-        style={{ margin: 0 }}
-      />
-    </>
-  );
-
   return (
     <ToolShell
       title="Diff Viewer"
       description="Compare two texts side by side. Inline diffs use smart word-level by default (small edits within a word are considered similar); enable the toggle to diff per character. Unified diff is shown centered below."
       toolId="diff"
-      actions={headerActions}
     >
       <Card elevation={1}>
         <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
@@ -292,6 +308,17 @@ const DiffViewerTool: React.FC = () => {
             <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>Highlights: Altered only</span>
             <Switch checked={alteredOnly} onChange={(e) => setAlteredOnly((e.currentTarget as HTMLInputElement).checked)} aria-label="Altered only" label={undefined} style={{ margin: 0 }} />
           </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>Show unified preview</span>
+            <Switch
+              checked={showUnifiedPreview}
+              onChange={(event) => setShowUnifiedPreview((event.currentTarget as HTMLInputElement).checked)}
+              aria-label="Show unified preview"
+              label={undefined}
+              style={{ margin: 0 }}
+              data-testid="toggle-show-preview"
+            />
+          </div>
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
           <div style={{ flex: '1 1 600px', minWidth: 480 }}>
@@ -302,7 +329,7 @@ const DiffViewerTool: React.FC = () => {
               onChange={setLeftText}
               onFocus={() => setActivePane('left')}
               onPasteCollapse={() => setLeftCollapsed(true)}
-              placeholder="Paste original text…"
+              placeholder="Paste original text."
               textareaRef={leftRef}
               collapsed={leftCollapsed}
               minRows={MIN_ROWS}
@@ -323,6 +350,15 @@ const DiffViewerTool: React.FC = () => {
               gutterWidth={GUTTER_WIDTH_PX}
               gutterInnerLeft={GUTTER_INNER_LEFT_PX}
               contentGap={CONTENT_GAP_PX}
+              onPrevChange={() => navigate('left', 'prev')}
+              onNextChange={() => navigate('left', 'next')}
+              navDisabled={!leftHasChanges}
+              prevTooltip="Previous change (Alt+Up)"
+              nextTooltip="Next change (Alt+Down)"
+              changeIndex={leftChangeIndex}
+              totalChanges={leftTotalChanges}
+              highlightLineIndex={leftHighlightLine}
+              counterTestId="left-change-counter"
             />
           </div>
           <div style={{ flex: '1 1 600px', minWidth: 480 }}>
@@ -333,7 +369,7 @@ const DiffViewerTool: React.FC = () => {
               onChange={setRightText}
               onFocus={() => setActivePane('right')}
               onPasteCollapse={() => setRightCollapsed(true)}
-              placeholder="Paste altered text…"
+              placeholder="Paste altered text."
               textareaRef={rightRef}
               collapsed={rightCollapsed}
               minRows={MIN_ROWS}
@@ -354,6 +390,15 @@ const DiffViewerTool: React.FC = () => {
               gutterWidth={GUTTER_WIDTH_PX}
               gutterInnerLeft={GUTTER_INNER_LEFT_PX}
               contentGap={CONTENT_GAP_PX}
+              onPrevChange={() => navigate('right', 'prev')}
+              onNextChange={() => navigate('right', 'next')}
+              navDisabled={!rightHasChanges}
+              prevTooltip="Previous change (Alt+Up)"
+              nextTooltip="Next change (Alt+Down)"
+              changeIndex={rightChangeIndex}
+              totalChanges={rightTotalChanges}
+              highlightLineIndex={rightHighlightLine}
+              counterTestId="right-change-counter"
             />
           </div>
         </div>

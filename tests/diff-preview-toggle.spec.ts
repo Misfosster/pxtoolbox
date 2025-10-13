@@ -11,29 +11,34 @@ test.describe('Diff unified preview toggle', () => {
 
 	test('toggle hides unified preview and persists across navigation and reload', async ({ page }) => {
 		const previewLocator = () => page.locator('#diff-output');
-		const toggleInput = () => page.getByLabel('Show unified preview');
-		const toggleLabel = () => page.locator('label:has-text("Show unified preview")');
+		const toggle = () => page.getByTestId('toggle-show-preview');
+		const clickToggle = async () => {
+			await page.evaluate(() => {
+				const input = document.querySelector('[data-testid="toggle-show-preview"]') as HTMLInputElement | null;
+				input?.click();
+			});
+		};
 
 		await expect(previewLocator()).toHaveCount(1);
-		await expect(toggleInput()).toBeChecked();
+		await expect(toggle()).toBeChecked();
 
-		await toggleLabel().click();
-		await expect(toggleInput()).not.toBeChecked();
+		await clickToggle();
+		await expect(toggle()).not.toBeChecked();
 		await expect(previewLocator()).toHaveCount(0);
 
 		await page.goto(JSON_ROUTE);
 		await page.waitForTimeout(200);
 
 		await page.goto(TARGET_ROUTE);
-		await expect(toggleInput()).not.toBeChecked();
+		await expect(toggle()).not.toBeChecked();
 		await expect(previewLocator()).toHaveCount(0);
 
 		await page.reload();
-		await expect(toggleInput()).not.toBeChecked();
+		await expect(toggle()).not.toBeChecked();
 		await expect(previewLocator()).toHaveCount(0);
 
-		await toggleLabel().click();
-		await expect(toggleInput()).toBeChecked();
+		await clickToggle();
+		await expect(toggle()).toBeChecked();
 		await expect(previewLocator()).toHaveCount(1);
 	});
 });

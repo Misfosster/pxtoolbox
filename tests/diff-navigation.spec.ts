@@ -3,7 +3,6 @@ import { test, expect, type Page } from '@playwright/test';
 const TARGET_ROUTE = '/#/tools/diff';
 const FIRST_CHANGE_INDEX = 14; // Line 15
 const SECOND_CHANGE_INDEX = 24; // Line 25
-const SCROLL_OFFSET = 24;
 
 function buildSampleLines(count: number): string[] {
 	return Array.from({ length: count }, (_, idx) => `Line ${String(idx + 1).padStart(2, '0')}`);
@@ -19,16 +18,19 @@ async function expectScrollNearLine(page: Page, textareaId: string, lineIndex: n
 				scrollTop: textarea.scrollTop,
 				paddingTop: parseFloat(computed.paddingTop || '0'),
 				lineHeight: parseFloat(computed.lineHeight || '20'),
+				clientHeight: textarea.clientHeight,
 			};
 		},
 		{ textareaId },
 	);
 
 	expect(metrics, `expected to read scroll metrics from ${textareaId}`).not.toBeNull();
-	const { scrollTop, paddingTop, lineHeight } = metrics!;
-	const expectedTop = Math.max(0, paddingTop + lineIndex * lineHeight - SCROLL_OFFSET);
-	// Allow a small tolerance for smooth scrolling rounding
-	expect(Math.abs(scrollTop - expectedTop)).toBeLessThan(Math.max(lineHeight * 2, 40));
+	const { scrollTop, paddingTop, lineHeight, clientHeight } = metrics!;
+	const lineTop = paddingTop + lineIndex * lineHeight;
+	const lineCenter = lineTop + lineHeight / 2;
+	const viewportCenter = scrollTop + clientHeight / 2;
+	const tolerance = Math.max(lineHeight, 40);
+	expect(Math.abs(viewportCenter - lineCenter)).toBeLessThan(tolerance);
 }
 
 test.describe('Diff navigation', () => {
@@ -50,28 +52,32 @@ test.describe('Diff navigation', () => {
 		await expect(page.getByTestId('overlay-left')).toBeVisible();
 		await expect(page.getByTestId('overlay-right')).toBeVisible();
 
-		const nextButton = page.getByTestId('diff-nav-next');
-		const prevButton = page.getByTestId('diff-nav-prev');
-		await expect(nextButton).toBeEnabled();
-		await expect(prevButton).toBeEnabled();
+		const leftNextButton = page.getByLabel('Next change (Alt+Down)').first();
+		const leftPrevButton = page.getByLabel('Previous change (Alt+Up)').first();
+		const rightNextButton = page.getByLabel('Next change (Alt+Down)').nth(1);
+		const rightPrevButton = page.getByLabel('Previous change (Alt+Up)').nth(1);
+
+		await expect(leftNextButton).toBeEnabled();
+		await expect(leftPrevButton).toBeEnabled();
 
 		await page.focus('#diff-left');
 
 		// First change via Next button (left pane)
-		await nextButton.click();
+		await leftNextButton.click();
 		await page.waitForFunction(() => {
 			const el = document.getElementById('diff-left') as HTMLTextAreaElement | null;
 			return !!el && el.scrollTop > 0;
 		});
 		await page.waitForTimeout(200);
 		await expectScrollNearLine(page, 'diff-left', FIRST_CHANGE_INDEX);
+		await expect(page.getByTestId('left-change-counter')).toHaveText('1/2');
 
 		const activeAfterFirst = await page.evaluate(() => document.activeElement && (document.activeElement as HTMLElement).id);
 		expect(activeAfterFirst).toBe('diff-left');
 
 		// Second change via Next button (left pane)
 		const scrollAfterFirst = await page.locator('#diff-left').evaluate((el) => el.scrollTop);
-		await nextButton.click();
+		await leftNextButton.click();
 		await page.waitForFunction(
 			(prev) => {
 				const el = document.getElementById('diff-left') as HTMLTextAreaElement | null;
@@ -81,10 +87,11 @@ test.describe('Diff navigation', () => {
 		);
 		await page.waitForTimeout(200);
 		await expectScrollNearLine(page, 'diff-left', SECOND_CHANGE_INDEX);
+		await expect(page.getByTestId('left-change-counter')).toHaveText('2/2');
 
 		// Previous change returns to the first modification
 		const scrollAfterSecond = await page.locator('#diff-left').evaluate((el) => el.scrollTop);
-		await prevButton.click();
+		await leftPrevButton.click();
 		await page.waitForFunction(
 			(prev) => {
 				const el = document.getElementById('diff-left') as HTMLTextAreaElement | null;
@@ -94,6 +101,7 @@ test.describe('Diff navigation', () => {
 		);
 		await page.waitForTimeout(200);
 		await expectScrollNearLine(page, 'diff-left', FIRST_CHANGE_INDEX);
+		await expect(page.getByTestId('left-change-counter')).toHaveText('1/2');
 
 		const activeAfterPrev = await page.evaluate(() => document.activeElement && (document.activeElement as HTMLElement).id);
 		expect(activeAfterPrev).toBe('diff-left');
@@ -108,6 +116,7 @@ test.describe('Diff navigation', () => {
 		});
 		await page.waitForTimeout(200);
 		await expectScrollNearLine(page, 'diff-right', FIRST_CHANGE_INDEX);
+		await expect(page.getByTestId('right-change-counter')).toHaveText('1/2');
 
 		await page.keyboard.press('Alt+ArrowDown');
 		const scrollRightAfterFirst = await page.locator('#diff-right').evaluate((el) => el.scrollTop);
@@ -120,6 +129,7 @@ test.describe('Diff navigation', () => {
 		);
 		await page.waitForTimeout(200);
 		await expectScrollNearLine(page, 'diff-right', SECOND_CHANGE_INDEX);
+		await expect(page.getByTestId('right-change-counter')).toHaveText('2/2');
 
 		await page.keyboard.press('Alt+ArrowUp');
 		const scrollRightAfterSecond = await page.locator('#diff-right').evaluate((el) => el.scrollTop);
@@ -132,6 +142,18 @@ test.describe('Diff navigation', () => {
 		);
 		await page.waitForTimeout(200);
 		await expectScrollNearLine(page, 'diff-right', FIRST_CHANGE_INDEX);
+		await expect(page.getByTestId('right-change-counter')).toHaveText('1/2');
+
+		// Use pane-specific buttons on the right pane
+		await rightNextButton.click();
+		await page.waitForTimeout(200);
+		await expectScrollNearLine(page, 'diff-right', SECOND_CHANGE_INDEX);
+		await expect(page.getByTestId('right-change-counter')).toHaveText('2/2');
+
+		await rightPrevButton.click();
+		await page.waitForTimeout(200);
+		await expectScrollNearLine(page, 'diff-right', FIRST_CHANGE_INDEX);
+		await expect(page.getByTestId('right-change-counter')).toHaveText('1/2');
 
 		const activeAfterKeyboard = await page.evaluate(() => document.activeElement && (document.activeElement as HTMLElement).id);
 		expect(activeAfterKeyboard).toBe('diff-right');

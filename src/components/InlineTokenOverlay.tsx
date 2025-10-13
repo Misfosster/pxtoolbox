@@ -22,9 +22,32 @@ export interface InlineTokenOverlayProps {
 	tintOpacity?: number;
 	/** Optional ID for testing */
 	id?: string;
+	/** Optional highlighted line index */
+	highlightLineIndex?: number;
+	/** Highlight fill color */
+	highlightColor?: string;
 }
 
-const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({ segmentsPerLine, leftOffsetPx, topOffsetPx, scrollTop, contentWidthPx, fontFamily, fontSize, fontWeight, letterSpacing, lineHeightPx, showAdd, showDel, side, lineRoles = [], tintOpacity = 0.10, id }) => {
+const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
+	segmentsPerLine,
+	leftOffsetPx,
+	topOffsetPx,
+	scrollTop,
+	contentWidthPx,
+	fontFamily,
+	fontSize,
+	fontWeight,
+	letterSpacing,
+	lineHeightPx,
+	showAdd,
+	showDel,
+	side,
+	lineRoles = [],
+	tintOpacity = 0.1,
+	id,
+	highlightLineIndex,
+	highlightColor = 'rgba(255, 215, 0, 0.35)',
+}) => {
     const lines = useMemo(() => segmentsPerLine, [segmentsPerLine]);
     return (
         <div
@@ -59,9 +82,17 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({ segmentsPerLine
             {lines.map((line, li) => {
                 const lineRole = lineRoles[li] || 'none';
                 const tintClass = lineRole !== 'none' ? `diff-row-tint ${lineRole}` : '';
+                const isHighlighted = typeof highlightLineIndex === 'number' && highlightLineIndex === li;
                 
                 return (
                     <div key={li} data-line-index={li} className={`relative ${tintClass}`}>
+                        {/* Focus highlight */}
+                        {isHighlighted && (
+                            <div
+                                className="absolute inset-0"
+                                style={{ backgroundColor: highlightColor, borderRadius: 4, zIndex: -5 }}
+                            />
+                        )}
                         {/* Line tint background */}
                         {lineRole !== 'none' && (
                             <div 
@@ -90,5 +121,3 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({ segmentsPerLine
 };
 
 export default InlineTokenOverlay;
-
-

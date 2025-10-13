@@ -1,4 +1,5 @@
-import React, { useCallback } from 'react';
+﻿import React, { useCallback } from 'react';
+import { Button, ButtonGroup, Tooltip } from '@blueprintjs/core';
 import Field from '../ui/Field';
 import ResizableTextArea from '../ui/ResizableTextArea';
 import InlineTokenOverlay from '../InlineTokenOverlay';
@@ -35,6 +36,18 @@ export interface DiffSidePaneProps {
 	gutterInnerLeft: number;
 	contentGap: number;
 	spellCheck?: boolean;
+	onPrevChange?: () => void;
+	onNextChange?: () => void;
+	navDisabled?: boolean;
+	prevDisabled?: boolean;
+	nextDisabled?: boolean;
+	prevTooltip?: string;
+	nextTooltip?: string;
+	highlightLineIndex?: number | null;
+	highlightColor?: string;
+	changeIndex?: number;
+	totalChanges?: number;
+	counterTestId?: string;
 }
 
 const DiffSidePane: React.FC<DiffSidePaneProps> = ({
@@ -66,6 +79,18 @@ const DiffSidePane: React.FC<DiffSidePaneProps> = ({
 	gutterInnerLeft,
 	contentGap,
 	spellCheck = false,
+	onPrevChange,
+	onNextChange,
+	navDisabled = false,
+	prevDisabled,
+	nextDisabled,
+	prevTooltip = 'Previous change',
+	nextTooltip = 'Next change',
+	highlightLineIndex = null,
+	highlightColor = 'rgba(255, 215, 0, 0.35)',
+	changeIndex = 0,
+	totalChanges = 0,
+	counterTestId,
 }) => {
 	const handlePointerDown = useCallback(
 		(e: React.PointerEvent<HTMLDivElement>) => {
@@ -135,8 +160,59 @@ const DiffSidePane: React.FC<DiffSidePaneProps> = ({
 			  parseFloat(getComputedStyle(textareaRef.current).paddingRight || '0')
 			: undefined;
 
+	const hasNavigation = Boolean(onPrevChange || onNextChange);
+	const hasCounter = totalChanges > 0 || changeIndex > 0;
+	const counterValue =
+		totalChanges > 0 ? `${Math.max(0, Math.min(changeIndex, totalChanges))}/${totalChanges}` : `0/${totalChanges}`;
+
+	const labelNode = hasNavigation ? (
+		<div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+			<span>{label}</span>
+			<div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+				<ButtonGroup style={{ display: 'flex', gap: 4 }}>
+					{onPrevChange && (
+						<Tooltip content={prevTooltip} position="top">
+							<Button
+								large
+								outlined
+								icon="arrow-up"
+								aria-label={prevTooltip}
+								onClick={onPrevChange}
+								disabled={navDisabled || prevDisabled}
+								style={{ minWidth: 44, height: 44 }}
+							/>
+						</Tooltip>
+					)}
+					{onNextChange && (
+						<Tooltip content={nextTooltip} position="top">
+							<Button
+								large
+								outlined
+								icon="arrow-down"
+								aria-label={nextTooltip}
+								onClick={onNextChange}
+								disabled={navDisabled || nextDisabled}
+								style={{ minWidth: 44, height: 44 }}
+							/>
+						</Tooltip>
+					)}
+				</ButtonGroup>
+				{hasCounter && (
+					<span
+						data-testid={counterTestId}
+						style={{ color: 'rgba(191, 204, 214, 0.85)', fontSize: '0.85rem', minWidth: 40, textAlign: 'center' }}
+					>
+						{counterValue}
+					</span>
+				)}
+			</div>
+		</div>
+	) : (
+		label
+	);
+
 	return (
-		<Field label={label} inputId={id}>
+		<Field label={labelNode} inputId={id}>
 			<div style={{ position: 'relative', overflow: 'hidden' }}>
 				<ResizableTextArea
 					id={id}
@@ -178,6 +254,8 @@ const DiffSidePane: React.FC<DiffSidePaneProps> = ({
 						showDel={showDel}
 						side={overlaySide}
 						lineRoles={overlayRoles}
+						highlightLineIndex={highlightLineIndex ?? undefined}
+						highlightColor={highlightColor}
 					/>
 				)}
 				<div
