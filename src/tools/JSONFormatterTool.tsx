@@ -103,8 +103,7 @@ const JSONFormatterTool: React.FC = () => {
               flex: '1 1 460px',
               minWidth: 320,
               overflow: 'hidden',
-              position: 'relative',
-              ...(textCollapsed ? { height: 40, maxHeight: 40 } : {})
+              position: 'relative'
             }}
           >
             <Field
@@ -136,105 +135,102 @@ const JSONFormatterTool: React.FC = () => {
               }
               error={error}
             >
-              {textCollapsed ? (
-                <div style={{ height: 40, border: '1px solid rgba(138,155,168,0.15)', borderRadius: 3, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.6)' }}>
-                  Text (collapsed)
-                </div>
-              ) : (
-                <div style={{ position: 'relative' }}>
-                  <ResizableTextArea
-                    id="json-input"
-                    placeholder="Type or paste JSON…"
-                    value={rawInput}
-                    onChange={handleLeftChange}
-                    minRows={10}
-                    autosize
-                    style={{ marginBottom: 0, paddingRight: 200 }}
+              <div style={{ position: 'relative' }}>
+                <ResizableTextArea
+                  id="json-input"
+                  placeholder="Type or paste JSON…"
+                  value={rawInput}
+                  onChange={handleLeftChange}
+                  minRows={textCollapsed ? 6 : 10}
+                  maxRows={textCollapsed ? 6 : 24}
+                  autosize
+                  style={{ marginBottom: 0, paddingRight: 200 }}
+                />
+                <OverlayActions gapPx={10}>
+                  <Button
+                    icon="layout-auto"
+                    minimal
+                    small
+                    onClick={handleFormat}
+                    disabled={!rawInput || !!error}
+                    data-testid="format-btn"
+                  >
+                    Format
+                  </Button>
+                  <Button
+                    icon="compressed"
+                    minimal
+                    small
+                    onClick={handleMinify}
+                    disabled={!rawInput || !!error}
+                    data-testid="minify-btn"
+                  >
+                    Minify
+                  </Button>
+                  <CopyButton
+                    icon="duplicate"
+                    successIcon="tick"
+                    intent={Intent.NONE}
+                    text={rawInput}
+                    disabled={!rawInput}
+                    label="Copy raw"
                   />
-                  <OverlayActions gapPx={10}>
-                    <Button
-                      icon="layout-auto"
-                      minimal
-                      small
-                      onClick={handleFormat}
-                      disabled={!rawInput || !!error}
-                      data-testid="format-btn"
-                    >
-                      Format
-                    </Button>
-                    <Button
-                      icon="compressed"
-                      minimal
-                      small
-                      onClick={handleMinify}
-                      disabled={!rawInput || !!error}
-                      data-testid="minify-btn"
-                    >
-                      Minify
-                    </Button>
-                    <CopyButton
-                      icon="duplicate"
-                      successIcon="tick"
-                      intent={Intent.NONE}
-                      text={rawInput}
-                      disabled={!rawInput}
-                      label="Copy raw"
-                    />
-                  </OverlayActions>
-                </div>
-              )}
+                </OverlayActions>
+              </div>
             </Field>
           </div>
 
-          <div
-            data-testid="json-tree-pane"
-            style={{
-              flex: '1 1 460px',
-              minWidth: 320,
-              position: 'relative'
-            }}
-          >
-            <JsonFoldView
-              value={parsedForTree}
-              apiRef={(api) => (treeApiRef.current = api)}
-              onChange={(next) => {
-                const prevScroll = { x: window.scrollX, y: window.scrollY };
-                setRawInput(prettyPrintJson(next));
-                requestAnimationFrame(() => window.scrollTo(prevScroll.x, prevScroll.y));
+          {parsedForTree ? (
+            <div
+              data-testid="json-tree-pane"
+              style={{
+                flex: '1 1 460px',
+                minWidth: 320,
+                position: 'relative'
               }}
-            />
-            <OverlayActions gapPx={10} style={{ top: 8, bottom: 'auto' }}>
-              <Button
-                minimal
-                small
-                onClick={() => {
-                  if (treeCollapsed) {
-                    treeApiRef.current?.expandAll();
-                    setTreeCollapsed(false);
-                  } else {
-                    treeApiRef.current?.collapseAll();
-                    setTreeCollapsed(true);
-                  }
+            >
+              <JsonFoldView
+                value={parsedForTree}
+                apiRef={(api) => (treeApiRef.current = api)}
+                onChange={(next) => {
+                  const prevScroll = { x: window.scrollX, y: window.scrollY };
+                  setRawInput(prettyPrintJson(next));
+                  requestAnimationFrame(() => window.scrollTo(prevScroll.x, prevScroll.y));
                 }}
-                icon={treeCollapsed ? 'double-chevron-down' : 'double-chevron-up'}
-                aria-label={treeCollapsed ? 'Expand all' : 'Collapse all'}
-                title={treeCollapsed ? 'Expand all' : 'Collapse all'}
-                data-testid="toggle-collapse-all"
-              >
-                {treeCollapsed ? 'Expand all' : 'Collapse all'}
-              </Button>
-            </OverlayActions>
-            <OverlayActions gapPx={10}>
-              <CopyButton
-                icon="clipboard"
-                successIcon="tick"
-                intent={Intent.PRIMARY}
-                text={formattedPretty}
-                disabled={!formattedPretty || !!error}
-                label="Copy formatted"
               />
-            </OverlayActions>
-          </div>
+              <OverlayActions gapPx={10} style={{ top: 8, bottom: 'auto' }}>
+                <Button
+                  minimal
+                  small
+                  onClick={() => {
+                    if (treeCollapsed) {
+                      treeApiRef.current?.expandAll();
+                      setTreeCollapsed(false);
+                    } else {
+                      treeApiRef.current?.collapseAll();
+                      setTreeCollapsed(true);
+                    }
+                  }}
+                  icon={treeCollapsed ? 'double-chevron-down' : 'double-chevron-up'}
+                  aria-label={treeCollapsed ? 'Expand all' : 'Collapse all'}
+                  title={treeCollapsed ? 'Expand all' : 'Collapse all'}
+                  data-testid="toggle-collapse-all"
+                >
+                  {treeCollapsed ? 'Expand all' : 'Collapse all'}
+                </Button>
+              </OverlayActions>
+              <OverlayActions gapPx={10}>
+                <CopyButton
+                  icon="clipboard"
+                  successIcon="tick"
+                  intent={Intent.PRIMARY}
+                  text={formattedPretty}
+                  disabled={!formattedPretty || !!error}
+                  label="Copy formatted"
+                />
+              </OverlayActions>
+            </div>
+          ) : null}
         </div>
 
         <div className="card-bottom" style={{ justifyItems: 'start' }}>

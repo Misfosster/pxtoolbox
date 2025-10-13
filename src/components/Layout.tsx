@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { 
   Card,
   H3,
@@ -21,24 +21,109 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const isToolsRoute = useMemo(() => pathname.startsWith('/tools'), [pathname]);
   const [toolsOpen, setToolsOpen] = useState<boolean>(true);
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceWidthMode>('default');
+  const [autoFull, setAutoFull] = useState<boolean>(false);
+  const autoFullRef = useRef<boolean>(false);
+  const wrapperRef = useRef<HTMLDivElement | null>(null);
+  const mainRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
     if (isToolsRoute) setToolsOpen(true);
   }, [isToolsRoute]);
 
   useEffect(() => {
+    // Reset to default width on route change
     setWorkspaceMode('default');
+    setAutoFull(false);
+    autoFullRef.current = false;
   }, [pathname]);
+
+  const evaluateOverflow = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const wrapper = wrapperRef.current;
+    const main = mainRef.current;
+    const container = wrapper?.parentElement;
+    if (!main || !container || !wrapper) {
+      setAutoFull(false);
+      return;
+    }
+
+    // Compare the main content's scroll width to the actual wrapper width.
+    // If content exceeds wrapper capacity, enable full width; otherwise stay at default.
+    const scrollWidth = main.scrollWidth;
+    const containerWidth = container.clientWidth || 0;
+    const baseWidth = containerWidth * 0.75;
+
+    // Hysteresis to avoid rapid toggling: expand later, shrink earlier for stability
+    const expandTriggerPx = baseWidth + 128; // expand only when content significantly exceeds base
+    const shrinkTriggerPx = baseWidth - 32;  // shrink when near base again
+
+    let next = autoFullRef.current;
+    if (!next && scrollWidth > expandTriggerPx) next = true;
+    if (next && scrollWidth < shrinkTriggerPx) next = false;
+
+    autoFullRef.current = next;
+    setAutoFull(next);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    evaluateOverflow();
+
+    let frame = 0;
+    const schedule = () => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(evaluateOverflow);
+    };
+
+    const resizeObserver = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(schedule) : null;
+    const mutationObserver = typeof MutationObserver !== 'undefined' ? new MutationObserver(schedule) : null;
+
+    const main = mainRef.current;
+    if (main) {
+      resizeObserver?.observe(main);
+      mutationObserver?.observe(main, { childList: true, subtree: true, attributes: true });
+    }
+
+    const container = wrapperRef.current?.parentElement;
+    if (container) {
+      resizeObserver?.observe(container);
+    }
+    const wrapper = wrapperRef.current;
+    if (wrapper) {
+      resizeObserver?.observe(wrapper);
+    }
+
+    window.addEventListener('resize', schedule);
+
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('resize', schedule);
+      resizeObserver?.disconnect();
+      mutationObserver?.disconnect();
+    };
+  }, [evaluateOverflow]);
+
+  useEffect(() => {
+    evaluateOverflow();
+  }, [workspaceMode, pathname, evaluateOverflow]);
+
+  const effectiveMode: WorkspaceWidthMode =
+    autoFull || workspaceMode === 'full' ? 'full' : 'default';
 
   const widthWrapperClassName = [
     'content-width-wrapper',
-    workspaceMode === 'full' ? 'content-width-wrapper--full' : undefined,
+    effectiveMode === 'full' ? 'content-width-wrapper--full' : undefined,
   ].filter(Boolean).join(' ');
 
   const providerValue = useMemo(() => ({
-    mode: workspaceMode,
+    mode: effectiveMode,
     setMode: setWorkspaceMode,
-  }), [workspaceMode]);
+  }), [effectiveMode]);
 
   return (
     <div className="app-layout">
@@ -85,9 +170,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       </aside>
 
       <main className="content-container">
-        <div className={widthWrapperClassName}>
+        <div className={widthWrapperClassName} ref={wrapperRef}>
           <WorkspaceWidthProvider value={providerValue}>
-            <div className="main-container">
+            <div className="main-container" ref={mainRef}>
               {children}
             </div>
           </WorkspaceWidthProvider>

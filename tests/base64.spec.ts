@@ -66,9 +66,8 @@ test.describe('Base64 Tool', () => {
 
     // Select From: Base64, To: File
     const fromSelect = page.locator('select').first();
-    const toSelect = page.locator('select').nth(1);
     await fromSelect.selectOption('base64');
-    await toSelect.selectOption('file');
+    // UI auto-sets To to File when From is Base64
 
     await page.locator('#file-base64-input').fill('aGVsbG8=');
     const downloadPromise = page.waitForEvent('download');

@@ -94,6 +94,8 @@ const Base64Tool: React.FC = () => {
           setFileText(decodedText);
           setFileBase64('');
           setFileError(null);
+          // Reflect uploaded Base64 content into the top Base64 pane as-is
+          setRightText(normalized);
         } catch {
           setFileText('');
           setFileBase64('');
@@ -113,6 +115,8 @@ const Base64Tool: React.FC = () => {
         setFileBase64(base64);
         setFileText('');
         setFileError(null);
+        // Reflect generated Base64 into the top Base64 pane
+        setRightText(base64);
       }
     };
     reader.readAsDataURL(file);

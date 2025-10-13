@@ -1,5 +1,5 @@
 import { useContext } from 'react';
-import { WorkspaceWidthContext, WorkspaceWidthMode } from '../contexts/WorkspaceWidthContext';
+import { WorkspaceWidthContext, type WorkspaceWidthMode } from '../contexts/WorkspaceWidthContext';
 
 export function useWorkspaceWidth() {
 	const ctx = useContext(WorkspaceWidthContext);
