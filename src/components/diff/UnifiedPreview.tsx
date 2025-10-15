@@ -15,27 +15,49 @@ export interface UnifiedPreviewProps {
 	leftNums: number[];
 	rightNums: number[];
 	ignoreWhitespace: boolean;
+	formatPreview: boolean;
 	charLevel: boolean;
 	changedOnly: boolean;
 	onChangedOnlyChange: (value: boolean) => void;
+	onFormatPreviewChange: (value: boolean) => void;
 }
 
 const MUTED_COLOR = 'var(--diff-fg-muted, rgba(191, 204, 214, 0.85))';
+const ZERO_WIDTH_RE = /[\u200b\u200c\u200d\ufeff]/g;
+const MULTIPLE_SPACE_RE = / {2,}/g;
+
+function formatTextForPreview(text: string, format: boolean): { display: string; whitespaceOnly: boolean } {
+	if (!format || !text) {
+		return { display: text, whitespaceOnly: !text || text.trim().length === 0 };
+	}
+	const sanitized = text.replace(ZERO_WIDTH_RE, '');
+	const leadingWhitespaceMatch = sanitized.match(/^[\t ]*/);
+	const leadingWhitespace = leadingWhitespaceMatch ? leadingWhitespaceMatch[0] : '';
+	let rest = sanitized.slice(leadingWhitespace.length);
+	rest = rest.replace(MULTIPLE_SPACE_RE, ' ');
+	rest = rest.replace(/ +$/g, '');
+	const combined = leadingWhitespace + rest;
+	return {
+		display: combined,
+		whitespaceOnly: combined.trim().length === 0,
+	};
+}
 
 const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 	id = 'diff-output',
 	height,
 	steps,
-	leftText,
-	rightText,
-	leftLines,
-	rightLines,
-	leftNums,
+leftText,
+rightText,
+leftLines,
+rightLines,
+leftNums,
 	rightNums,
-	ignoreWhitespace,
-	charLevel,
-	changedOnly,
+formatPreview,
+charLevel,
+changedOnly,
 	onChangedOnlyChange,
+	onFormatPreviewChange,
 }) => {
 	const previewModel = useMemo(() => {
 		const leftIsEmpty = leftText.trim() === '';
@@ -74,6 +96,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 	}, [displaySteps]);
 
 	const rows = useMemo(() => {
+		let lastRenderedWhitespace = false;
 		type LocalSeg = DiffSeg & { diffType?: 'add' | 'del' };
 		const rowNodes: React.ReactNode[] = [];
 
@@ -145,21 +168,39 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 
 			if (step.type === 'same') {
 				const displayNum = displayLeftNums[idx] || (step.i ?? 0) + 1;
-				const content = step.i != null ? leftLines[step.i] ?? '' : '';
+				const contentRaw = step.i != null ? leftLines[step.i] ?? '' : '';
+				const { display: content, whitespaceOnly } = formatTextForPreview(contentRaw, formatPreview);
+				const isWhitespaceRow = formatPreview && whitespaceOnly;
+				if (formatPreview && isWhitespaceRow && lastRenderedWhitespace) {
+					continue;
+				}
+				lastRenderedWhitespace = isWhitespaceRow;
 				rowNodes.push(renderLine(`same-${idx}`, displayNum, ' ', content));
 				continue;
 			}
 
 			if (step.type === 'del') {
 				const displayNum = displayLeftNums[idx] || (step.i ?? 0) + 1;
-				const content = step.i != null ? leftLines[step.i] ?? '' : '';
+				const contentRaw = step.i != null ? leftLines[step.i] ?? '' : '';
+				const { display: content, whitespaceOnly } = formatTextForPreview(contentRaw, formatPreview);
+				const isWhitespaceRow = formatPreview && whitespaceOnly;
+				if (formatPreview && isWhitespaceRow && lastRenderedWhitespace) {
+					continue;
+				}
+				lastRenderedWhitespace = isWhitespaceRow;
 				rowNodes.push(renderLine(`del-${idx}`, displayNum, '-', content));
 				continue;
 			}
 
 			if (step.type === 'add') {
 				const displayNum = displayRightNums[idx] || (step.j ?? 0) + 1;
-				const content = step.j != null ? rightLines[step.j] ?? '' : '';
+				const contentRaw = step.j != null ? rightLines[step.j] ?? '' : '';
+				const { display: content, whitespaceOnly } = formatTextForPreview(contentRaw, formatPreview);
+				const isWhitespaceRow = formatPreview && whitespaceOnly;
+				if (formatPreview && isWhitespaceRow && lastRenderedWhitespace) {
+					continue;
+				}
+				lastRenderedWhitespace = isWhitespaceRow;
 				rowNodes.push(renderLine(`add-${idx}`, displayNum, '+', content));
 				continue;
 			}
@@ -168,16 +209,42 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 				const displayNum = displayLeftNums[idx] || (step.i ?? 0) + 1;
 				const aRaw = step.i != null ? leftLines[step.i] ?? '' : '';
 				const bRaw = step.j != null ? rightLines[step.j] ?? '' : '';
-				const segs = mergedSegments(aRaw, bRaw, {
-					ignoreWhitespace,
+				const leftFormatted = formatTextForPreview(aRaw, formatPreview);
+				const rightFormatted = formatTextForPreview(bRaw, formatPreview);
+
+				const leftDiffSource = formatPreview ? leftFormatted.display : aRaw;
+				const rightDiffSource = formatPreview ? rightFormatted.display : bRaw;
+
+				let segs = mergedSegments(leftDiffSource, rightDiffSource, {
+					ignoreWhitespace: false,
 					mode: charLevel ? 'char' : 'word',
 				}) as LocalSeg[];
-				rowNodes.push(renderLine(`mod-${idx}`, displayNum, '~', aRaw, segs));
+
+				if (formatPreview) {
+					segs = segs.map((seg, segIdx) => {
+						const text = seg.text ?? '';
+						if (segIdx > 0 && text.trim() === '') {
+							const collapsed = text.includes('\t') ? text : text.length > 0 ? ' ' : text;
+							return { ...seg, text: collapsed };
+						}
+						return seg;
+					});
+				}
+
+				const hasInlineChanges = segs.some((seg) => seg.changed);
+				const marker = hasInlineChanges ? '~' : ' ';
+				const content = leftFormatted.display;
+				const isWhitespaceRow = formatPreview && !hasInlineChanges && leftFormatted.whitespaceOnly;
+				if (formatPreview && isWhitespaceRow && lastRenderedWhitespace) {
+					continue;
+				}
+				lastRenderedWhitespace = isWhitespaceRow;
+				rowNodes.push(renderLine(`mod-${idx}`, displayNum, marker, content, segs));
 			}
 		}
 
 		return rowNodes;
-	}, [steps, changedOnly, leftNums, rightNums, leftLines, rightLines, ignoreWhitespace, charLevel]);
+	}, [steps, changedOnly, leftNums, rightNums, leftLines, rightLines, formatPreview, charLevel]);
 
 	return (
 		<Field label="Unified diff (preview)" inputId={id}>
@@ -188,7 +255,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 				<span data-testid="count-add" style={{ color: 'rgba(46,160,67,0.9)' }}>+{counts.add}</span>
 				<span data-testid="count-del" style={{ color: 'rgba(248,81,73,0.9)' }}>-{counts.del}</span>
 				<span data-testid="count-mod" style={{ color: 'rgba(100,148,237,0.9)' }}>~{counts.mod}</span>
-				<span style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+				<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginLeft: 'auto' }}>
 					<span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>
 						Changed-only preview
 					</span>
@@ -198,6 +265,20 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 						aria-label="Changed-only preview"
 						label={undefined}
 						style={{ margin: 0 }}
+						data-testid="toggle-changed-only-preview"
+					/>
+				</span>
+				<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+					<span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>
+						Reformat preview
+					</span>
+					<Switch
+						checked={formatPreview}
+						onChange={(event) => onFormatPreviewChange((event.currentTarget as HTMLInputElement).checked)}
+						aria-label="Reformat preview"
+						label={undefined}
+						style={{ margin: 0 }}
+						data-testid="toggle-format-preview"
 					/>
 				</span>
 			</div>

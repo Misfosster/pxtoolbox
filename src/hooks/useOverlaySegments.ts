@@ -15,13 +15,31 @@ interface UseOverlaySegmentsParams {
 	steps: Step[];
 	leftLines: string[];
 	rightLines: string[];
+	ignoreWhitespace: boolean;
 	charLevel: boolean;
+}
+
+const WHITESPACE_TOKEN = /^[\s\u200b\u200c\u200d\ufeff]*$/;
+
+function sanitizeSegment(seg: DiffSeg, ignoreWhitespace: boolean): DiffSeg {
+	if (!ignoreWhitespace) return seg;
+	if (!seg.changed) return seg;
+	const text = seg.text ?? '';
+	if (WHITESPACE_TOKEN.test(text)) {
+		return { text, changed: false };
+	}
+	return seg;
+}
+
+function isWhitespaceOnlyLine(line: string): boolean {
+	return WHITESPACE_TOKEN.test(line);
 }
 
 export function useOverlaySegments({
 	steps,
 	leftLines,
 	rightLines,
+	ignoreWhitespace,
 	charLevel,
 }: UseOverlaySegmentsParams): OverlaySegments {
 	return useMemo(() => {
@@ -49,6 +67,11 @@ export function useOverlaySegments({
 				const li = st.i ?? -1;
 				if (li >= 0) {
 					const lText = leftLines[li] ?? '';
+					if (ignoreWhitespace && isWhitespaceOnlyLine(lText)) {
+						leftArr[li] = [{ text: lText, changed: false }];
+						leftRoles[li] = 'none';
+						continue;
+					}
 					leftArr[li] = [{ text: lText, changed: true, diffType: 'del' }];
 					leftRoles[li] = 'del';
 				}
@@ -59,6 +82,11 @@ export function useOverlaySegments({
 				const rj = st.j ?? -1;
 				if (rj >= 0) {
 					const rText = rightLines[rj] ?? '';
+					if (ignoreWhitespace && isWhitespaceOnlyLine(rText)) {
+						rightArr[rj] = [{ text: rText, changed: false }];
+						rightRoles[rj] = 'none';
+						continue;
+					}
 					rightArr[rj] = [{ text: rText, changed: true, diffType: 'add' }];
 					rightRoles[rj] = 'add';
 				}
@@ -71,11 +99,21 @@ export function useOverlaySegments({
 				const aRaw = li >= 0 ? leftLines[li] ?? '' : '';
 				const bRaw = rj >= 0 ? rightLines[rj] ?? '' : '';
 
-				const segs = mergedSegments(aRaw, bRaw, { ignoreWhitespace: false, mode: charLevel ? 'char' : 'word' });
+				const segs = mergedSegments(aRaw, bRaw, {
+					ignoreWhitespace: false,
+					mode: charLevel ? 'char' : 'word',
+				});
 
 				if (li >= 0) {
-					leftArr[li] = segs.filter((s) => !s.changed || s.diffType === 'del');
-					leftRoles[li] = 'del';
+					const leftSegs = segs
+						.filter((s) => !s.changed || s.diffType === 'del')
+						.map((seg) => sanitizeSegment(seg, ignoreWhitespace));
+					if (leftSegs.length === 0) {
+						leftSegs.push({ text: aRaw, changed: false });
+					}
+					const leftHasChanges = leftSegs.some((seg) => seg.changed && seg.diffType === 'del');
+					leftArr[li] = leftSegs;
+					leftRoles[li] = leftHasChanges ? 'del' : 'none';
 					if (process.env.NODE_ENV !== 'production') {
 						const leftOverlayText = leftArr[li].map((s) => s.text).join('');
 						if (leftOverlayText !== aRaw) {
@@ -86,8 +124,15 @@ export function useOverlaySegments({
 				}
 
 				if (rj >= 0) {
-					rightArr[rj] = segs.filter((s) => !s.changed || s.diffType === 'add');
-					rightRoles[rj] = 'add';
+					const rightSegs = segs
+						.filter((s) => !s.changed || s.diffType === 'add')
+						.map((seg) => sanitizeSegment(seg, ignoreWhitespace));
+					if (rightSegs.length === 0) {
+						rightSegs.push({ text: bRaw, changed: false });
+					}
+					const rightHasChanges = rightSegs.some((seg) => seg.changed && seg.diffType === 'add');
+					rightArr[rj] = rightSegs;
+					rightRoles[rj] = rightHasChanges ? 'add' : 'none';
 					if (process.env.NODE_ENV !== 'production') {
 						const rightOverlayText = rightArr[rj].map((s) => s.text).join('');
 						if (rightOverlayText !== bRaw) {
@@ -116,5 +161,5 @@ export function useOverlaySegments({
 			leftLineRoles: leftRoles,
 			rightLineRoles: rightRoles,
 		};
-	}, [steps, leftLines, rightLines, charLevel]);
+	}, [steps, leftLines, rightLines, ignoreWhitespace, charLevel]);
 }

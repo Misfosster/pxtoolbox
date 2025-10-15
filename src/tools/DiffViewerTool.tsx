@@ -6,10 +6,12 @@ import { normalizeEOL } from '../utils/diff/normalize';
 import { alignLines, splitLinesNoTrailingEmpty } from '../utils/diff/line';
 import { useGutter } from '../hooks/useGutter';
 import { useWorkspaceWidth } from '../hooks/useWorkspaceWidth';
-import UnifiedPreview from '../components/diff/UnifiedPreview';
 import { useOverlaySegments } from '../hooks/useOverlaySegments';
 import { useDiffNavigation } from '../hooks/useDiffNavigation';
 import DiffSidePane from '../components/diff/DiffSidePane';
+import UnifiedPreview from '../components/diff/UnifiedPreview';
+
+const WHITESPACE_ONLY_RE = /^[\s\u200b\u200c\u200d\ufeff]*$/;
 
 const DiffViewerTool: React.FC = () => {
   const [leftText, setLeftText] = useState<string>('');
@@ -38,6 +40,7 @@ const DiffViewerTool: React.FC = () => {
     'pxtoolbox.diff.showUnifiedPreview',
     true,
   );
+  const [formatPreview, setFormatPreview] = useLocalStorageBoolean('pxtoolbox.diff.formatPreview', false);
   const [activePane, setActivePane] = useState<'left' | 'right'>('left');
   const [leftScrollTop, setLeftScrollTop] = useState<number>(0);
   const [rightScrollTop, setRightScrollTop] = useState<number>(0);
@@ -143,21 +146,52 @@ const DiffViewerTool: React.FC = () => {
   // Normalize EOLs (immediate) previously used for overlay; retained approach removed to keep one source of truth
 
   // Build alignment (steps + local numbering) used for side-by-side view and preview (debounced)
+  const leftLines = useMemo(() => splitLinesNoTrailingEmpty(leftNorm), [leftNorm]);
+  const rightLines = useMemo(() => splitLinesNoTrailingEmpty(rightNorm), [rightNorm]);
+
   const alignment = useMemo(
     () => alignLines(leftNorm, rightNorm, { ignoreWhitespace: debIgnoreWs }),
     [leftNorm, rightNorm, debIgnoreWs],
   );
-  const { steps, leftNums, rightNums } = alignment;
+  const { steps: rawSteps, leftNums: rawLeftNums, rightNums: rawRightNums } = alignment;
 
-  // Split lines for content lookup
-  const leftLines = useMemo(() => splitLinesNoTrailingEmpty(leftNorm), [leftNorm]);
-  const rightLines = useMemo(() => splitLinesNoTrailingEmpty(rightNorm), [rightNorm]);
+  const filteredAlignment = useMemo(() => {
+    if (!debIgnoreWs) {
+      return { steps: rawSteps, leftNums: rawLeftNums, rightNums: rawRightNums };
+    }
+    const fSteps: typeof rawSteps = [];
+    const fLeftNums: number[] = [];
+    const fRightNums: number[] = [];
+
+    rawSteps.forEach((step, idx) => {
+      if (step.type === 'add') {
+        const line = step.j != null ? rightLines[step.j] ?? '' : '';
+        if (WHITESPACE_ONLY_RE.test(line)) {
+          return;
+        }
+      }
+      if (step.type === 'del') {
+        const line = step.i != null ? leftLines[step.i] ?? '' : '';
+        if (WHITESPACE_ONLY_RE.test(line)) {
+          return;
+        }
+      }
+      fSteps.push(step);
+      fLeftNums.push(rawLeftNums[idx]);
+      fRightNums.push(rawRightNums[idx]);
+    });
+
+    return { steps: fSteps, leftNums: fLeftNums, rightNums: fRightNums };
+  }, [debIgnoreWs, rawSteps, rawLeftNums, rawRightNums, rightLines, leftLines]);
+
+  const { steps, leftNums, rightNums } = filteredAlignment;
 
   // Build inline overlay segments and line roles per side mapped to ACTUAL lines per side (no placeholder rows)
   const { leftOverlayLines, rightOverlayLines, leftLineRoles, rightLineRoles } = useOverlaySegments({
     steps,
     leftLines,
     rightLines,
+    ignoreWhitespace: debIgnoreWs,
     charLevel: debCharInline,
   });
 
@@ -418,9 +452,11 @@ const DiffViewerTool: React.FC = () => {
                 leftNums={leftNums}
                 rightNums={rightNums}
                 ignoreWhitespace={debIgnoreWs}
+                formatPreview={formatPreview}
                 charLevel={debCharInline}
                 changedOnly={changedOnlyPreview}
                 onChangedOnlyChange={setChangedOnlyPreview}
+                onFormatPreviewChange={setFormatPreview}
               />
             </div>
           </div>
@@ -434,3 +470,4 @@ const DiffViewerTool: React.FC = () => {
 };
 
 export default DiffViewerTool;
+
