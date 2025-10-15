@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import type { Step } from '../utils/diff/line';
+import type { DiffSeg } from '../utils/diff/inline';
 
 type PaneSide = 'left' | 'right';
 
@@ -10,7 +11,16 @@ interface DiffNavigationParams {
 	rightLines: string[];
 	leftRef: RefObject<HTMLTextAreaElement | null>;
 	rightRef: RefObject<HTMLTextAreaElement | null>;
+	leftOverlaySegments?: DiffSeg[][];
+	rightOverlaySegments?: DiffSeg[][];
 	scrollOffset?: number;
+}
+
+export interface PaneChange {
+	lineIndex: number;
+	segmentIndex: number;
+	diffType: 'add' | 'del';
+	text: string;
 }
 
 interface PaneNavigation {
@@ -20,6 +30,8 @@ interface PaneNavigation {
 	changeIndex: number;
 	totalChanges: number;
 	lineIndex: number | null;
+	currentChange: PaneChange | null;
+	changes: PaneChange[];
 }
 
 export interface DiffNavigationResult {
@@ -28,16 +40,61 @@ export interface DiffNavigationResult {
 	reset: () => void;
 }
 
-function computeChangeIndices(steps: Step[], side: PaneSide): number[] {
-	const indices: number[] = [];
+function computePaneChanges(
+	steps: Step[],
+	overlaySegments: DiffSeg[][] | undefined,
+	lines: string[],
+	side: PaneSide,
+): PaneChange[] {
+	if (overlaySegments) {
+		const blobs: PaneChange[] = [];
+		for (let lineIndex = 0; lineIndex < overlaySegments.length; lineIndex++) {
+			const segments = overlaySegments[lineIndex] ?? [];
+			for (let segmentIndex = 0; segmentIndex < segments.length; segmentIndex++) {
+				const seg = segments[segmentIndex];
+				if (!seg || !seg.changed) continue;
+				const type = seg.diffType;
+				if (side === 'left') {
+					if (type !== 'del') continue;
+					blobs.push({
+						lineIndex,
+						segmentIndex,
+						diffType: 'del',
+						text: seg.text,
+					});
+				} else {
+					if (type !== 'add') continue;
+					blobs.push({
+						lineIndex,
+						segmentIndex,
+						diffType: 'add',
+						text: seg.text,
+					});
+				}
+			}
+		}
+		return blobs;
+	}
+
+	const indices: PaneChange[] = [];
 	for (const step of steps) {
 		if (side === 'left') {
 			if ((step.type === 'del' || step.type === 'mod') && step.i != null) {
-				indices.push(step.i);
+				indices.push({
+					lineIndex: step.i,
+					segmentIndex: 0,
+					diffType: 'del',
+					text: lines[step.i] ?? '',
+				});
 			}
 		} else {
 			if ((step.type === 'add' || step.type === 'mod') && step.j != null) {
-				indices.push(step.j);
+				indices.push({
+					lineIndex: step.j,
+					segmentIndex: 0,
+					diffType: 'add',
+					text: lines[step.j] ?? '',
+				});
 			}
 		}
 	}
@@ -95,10 +152,18 @@ export function useDiffNavigation({
 	rightLines,
 	leftRef,
 	rightRef,
+	leftOverlaySegments,
+	rightOverlaySegments,
 	scrollOffset = 0,
 }: DiffNavigationParams): DiffNavigationResult {
-	const leftChanges = useMemo(() => computeChangeIndices(steps, 'left'), [steps]);
-	const rightChanges = useMemo(() => computeChangeIndices(steps, 'right'), [steps]);
+	const leftChanges = useMemo(
+		() => computePaneChanges(steps, leftOverlaySegments, leftLines, 'left'),
+		[steps, leftOverlaySegments, leftLines],
+	);
+	const rightChanges = useMemo(
+		() => computePaneChanges(steps, rightOverlaySegments, rightLines, 'right'),
+		[steps, rightOverlaySegments, rightLines],
+	);
 
 	const leftIndexRef = useRef<number>(-1);
 	const rightIndexRef = useRef<number>(-1);
@@ -106,6 +171,8 @@ export function useDiffNavigation({
 	const [rightCurrentIndex, setRightCurrentIndex] = useState<number>(0);
 	const [leftLineIndex, setLeftLineIndex] = useState<number | null>(null);
 	const [rightLineIndex, setRightLineIndex] = useState<number | null>(null);
+	const [leftCurrentChange, setLeftCurrentChange] = useState<PaneChange | null>(null);
+	const [rightCurrentChange, setRightCurrentChange] = useState<PaneChange | null>(null);
 
 	useEffect(() => {
 		leftIndexRef.current = -1;
@@ -114,7 +181,9 @@ export function useDiffNavigation({
 		setRightCurrentIndex(0);
 		setLeftLineIndex(null);
 		setRightLineIndex(null);
-	}, [steps]);
+		setLeftCurrentChange(null);
+		setRightCurrentChange(null);
+	}, [steps, leftOverlaySegments, rightOverlaySegments]);
 
 	const scrollToChange = useCallback(
 		(side: PaneSide, direction: 1 | -1) => {
@@ -148,7 +217,8 @@ export function useDiffNavigation({
 			if (!textarea) return false;
 
 			indexRef.current = nextIndex;
-			const lineIndex = changes[nextIndex];
+			const change = changes[nextIndex];
+			const lineIndex = change.lineIndex;
 			const metrics = getLineMetrics(textarea, lines, lineIndex);
 			if (!metrics) return false;
 			const { top, lineHeight } = metrics;
@@ -166,9 +236,11 @@ export function useDiffNavigation({
 			if (isLeft) {
 				setLeftCurrentIndex(nextIndex + 1);
 				setLeftLineIndex(lineIndex);
+				setLeftCurrentChange(change);
 			} else {
 				setRightCurrentIndex(nextIndex + 1);
 				setRightLineIndex(lineIndex);
+				setRightCurrentChange(change);
 			}
 
 			return true;
@@ -188,6 +260,8 @@ export function useDiffNavigation({
 		setRightCurrentIndex(0);
 		setLeftLineIndex(null);
 		setRightLineIndex(null);
+		setLeftCurrentChange(null);
+		setRightCurrentChange(null);
 	}, []);
 
 	return {
@@ -198,6 +272,8 @@ export function useDiffNavigation({
 			changeIndex: leftCurrentIndex,
 			totalChanges: leftChanges.length,
 			lineIndex: leftLineIndex,
+			currentChange: leftCurrentChange,
+			changes: leftChanges,
 		},
 		right: {
 			goNextChange: goNextRight,
@@ -206,6 +282,8 @@ export function useDiffNavigation({
 			changeIndex: rightCurrentIndex,
 			totalChanges: rightChanges.length,
 			lineIndex: rightLineIndex,
+			currentChange: rightCurrentChange,
+			changes: rightChanges,
 		},
 		reset,
 	};

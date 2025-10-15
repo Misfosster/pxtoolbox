@@ -12,6 +12,7 @@ export interface InlineTokenOverlayProps {
 	fontWeight?: string;
 	letterSpacing?: string;
 	lineHeightPx?: number;
+	tabSize?: number;
 	showAdd: boolean;
 	showDel: boolean;
 	/** Which side this overlay represents; used for stable test hooks */
@@ -39,6 +40,7 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
 	fontWeight,
 	letterSpacing,
 	lineHeightPx,
+	tabSize,
 	showAdd,
 	showDel,
 	side,
@@ -74,8 +76,7 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
                 lineHeight: lineHeightPx ? `${lineHeightPx}px` : undefined,
                 fontVariantLigatures: 'none',
                 textRendering: 'optimizeSpeed',
-                // @ts-ignore tabSize is supported
-                tabSize: 4,
+                tabSize: tabSize ?? 4,
                 color: 'transparent',
             }}
         >

@@ -114,7 +114,8 @@ describe('InlineTokenOverlay', () => {
         { left: 'hello world', right: 'hello universe' },
         { left: 'café — touché', right: 'cafe — touch' },
         { left: '👍 family: 👨‍👩‍👧', right: '👍🏻 family: 👨‍👩‍👧‍👦' },
-        { left: 'multi\nline\ntext', right: 'multi\nline\nchange' }
+        { left: 'multi\nline\ntext', right: 'multi\nline\nchange' },
+        { left: '\tindent\tleft', right: '\tindent\tright' }
       ];
       
       testCases.forEach(({ left, right }) => {

@@ -7,11 +7,28 @@ export interface GutterMetrics {
 	fontSize: string;
 	fontWeight: string;
 	letterSpacing: string;
+	tabSize: number;
 }
 
 export function useGutter(text: string, textarea: HTMLTextAreaElement | null) {
 	const [gutter, setGutter] = useState<string>('');
-	const [metrics, setMetrics] = useState<GutterMetrics>({ lineHeight: 20, paddingTop: 8, fontFamily: 'monospace', fontSize: '14px', fontWeight: '400', letterSpacing: 'normal' });
+	const [metrics, setMetrics] = useState<GutterMetrics>({
+		lineHeight: 20,
+		paddingTop: 8,
+		fontFamily: 'monospace',
+		fontSize: '14px',
+		fontWeight: '400',
+		letterSpacing: 'normal',
+		tabSize: 4,
+	});
+
+	function readTabSize(el: HTMLTextAreaElement | null): number {
+		if (!el) return 4;
+		const cs = window.getComputedStyle(el);
+		const raw = cs.getPropertyValue('tab-size') || (el.style as any).tabSize || '4';
+		const parsed = Number.parseFloat(String(raw).trim());
+		return Number.isFinite(parsed) && parsed > 0 ? parsed : 4;
+	}
 
 	function computeGutter(text0: string, el: HTMLTextAreaElement | null): string {
 		if (!text0) return '';
@@ -35,7 +52,7 @@ export function useGutter(text: string, textarea: HTMLTextAreaElement | null) {
 		mirror.style.font = `${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
 		mirror.style.lineHeight = cs.lineHeight || `${lineHeight}px`;
 		mirror.style.letterSpacing = cs.letterSpacing || 'normal';
-		(mirror.style as any).tabSize = (el.style as any).tabSize || '4';
+		(mirror.style as any).tabSize = String(readTabSize(el));
 		document.body.appendChild(mirror);
 		const gutterLines: string[] = [];
 		const logical = text0.split('\n');
@@ -64,6 +81,7 @@ export function useGutter(text: string, textarea: HTMLTextAreaElement | null) {
 			fontSize: cs.fontSize || '14px',
 			fontWeight: cs.fontWeight || '400',
 			letterSpacing: cs.letterSpacing || 'normal',
+			tabSize: readTabSize(el),
 		});
 	}, [text, textarea]);
 
@@ -78,5 +96,4 @@ export function useGutter(text: string, textarea: HTMLTextAreaElement | null) {
 
 	return { gutter, metrics } as const;
 }
-
 

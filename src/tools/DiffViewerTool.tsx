@@ -167,6 +167,8 @@ const DiffViewerTool: React.FC = () => {
     rightLines,
     leftRef,
     rightRef,
+    leftOverlaySegments: leftOverlayLines,
+    rightOverlaySegments: rightOverlayLines,
   });
   const {
     goNextChange: goNextLeft,

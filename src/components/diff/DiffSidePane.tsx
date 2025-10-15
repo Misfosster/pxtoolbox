@@ -7,6 +7,8 @@ import type { DiffSeg } from '../../utils/diff/inline';
 import type { OverlayLineRole } from '../../hooks/useOverlaySegments';
 import type { GutterMetrics } from '../../hooks/useGutter';
 
+const DEFAULT_TAB_SIZE = 4;
+
 export interface DiffSidePaneProps {
 	id: string;
 	label: string;
@@ -234,6 +236,7 @@ const DiffSidePane: React.FC<DiffSidePaneProps> = ({
 						height,
 						fontFamily:
 							'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
+						tabSize: metrics.tabSize ?? DEFAULT_TAB_SIZE,
 					}}
 					inputRef={(el) => (textareaRef.current = el)}
 				/>
@@ -250,6 +253,7 @@ const DiffSidePane: React.FC<DiffSidePaneProps> = ({
 						fontWeight={metrics.fontWeight}
 						letterSpacing={metrics.letterSpacing}
 						lineHeightPx={metrics.lineHeight}
+						tabSize={metrics.tabSize ?? DEFAULT_TAB_SIZE}
 						showAdd={showAdd}
 						showDel={showDel}
 						side={overlaySide}
