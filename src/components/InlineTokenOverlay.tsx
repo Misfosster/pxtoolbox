@@ -27,9 +27,9 @@ export interface InlineTokenOverlayProps {
 	highlightLineIndex?: number;
 	/** Highlight fill color */
 	highlightColor?: string;
-	/** Enable pointer interactions on lines for resolve mode */
+	/** Enable pointer interaction for acceptance mode */
 	interactive?: boolean;
-	/** Called when a line is clicked (index relative to segmentsPerLine) */
+	/** Callback when a line is clicked (interactive only) */
 	onLineClick?: (lineIndex: number) => void;
 }
 
@@ -108,22 +108,12 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
                         )}
                         {/* Line tint background */}
                         {lineRole !== 'none' && (
-                            <div
+                            <div 
                                 className="absolute inset-0 -z-10"
-                                style={{
-                                    backgroundColor: (() => {
-                                        if (lineRole === 'add') {
-                                            return `var(--diff-add-row-bg, rgba(34, 197, 94, ${tintOpacity}))`;
-                                        }
-                                        if (lineRole === 'del') {
-                                            return `var(--diff-del-row-bg, rgba(239, 68, 68, ${tintOpacity}))`;
-                                        }
-                                        if (lineRole === 'resolved') {
-                                            const resolvedOpacity = Math.min(0.5, tintOpacity + 0.15);
-                                            return `var(--diff-resolved-row-bg, rgba(139, 92, 246, ${resolvedOpacity}))`;
-                                        }
-                                        return undefined;
-                                    })(),
+                                style={{ 
+                                    backgroundColor: lineRole === 'add' 
+                                        ? `var(--diff-add-row-bg, rgba(34, 197, 94, ${tintOpacity}))` 
+                                        : `var(--diff-del-row-bg, rgba(239, 68, 68, ${tintOpacity}))` 
                                 }}
                             />
                         )}

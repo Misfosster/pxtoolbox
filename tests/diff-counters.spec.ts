@@ -16,7 +16,7 @@ test.describe('Diff Viewer – counters and changed-only preview', () => {
     await expect(counters).toBeVisible();
     await expect(counters.getByTestId('count-add')).toHaveText('+1');
     await expect(counters.getByTestId('count-del')).toHaveText('-1');
-    await expect(counters.getByTestId('count-mod')).toHaveText('~1');
+    await expect(counters.getByTestId('count-mod')).toHaveText('?1');
   });
 
   test('changed-only preview hides unchanged lines', async ({ page }) => {
@@ -33,7 +33,7 @@ test.describe('Diff Viewer – counters and changed-only preview', () => {
 
     await expect(page.locator('#diff-output [data-preview-line][data-marker=" "]')).toHaveCount(0);
     // Still shows the modified line
-    await expect(page.locator('#diff-output [data-preview-line][data-marker="~"]')).toHaveCount(1);
+    await expect(page.locator('#diff-output [data-preview-line][data-marker="?"]')).toHaveCount(1);
   });
 });
 

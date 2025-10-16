@@ -16,7 +16,12 @@ export type CompareOpts = { ignoreWhitespace?: boolean };
 export function compareKey(s: string, opts: CompareOpts = {}): string {
   let t = s.normalize('NFC');           // pick NFC and stick with it
   if (opts.ignoreWhitespace) {
-    t = t.replace(/\s+/g, ' ').trim();  // collapse whitespace and trim
+    // Normalize NBSPs -> spaces
+    t = t.replace(/\u00A0/g, ' ');
+    // Collapse runs of whitespace to a single space
+    t = t.replace(/\s+/g, ' ');
+    // Trim edges
+    t = t.trim();
   }
   return t;
 }

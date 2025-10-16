@@ -50,8 +50,6 @@ export interface DiffSidePaneProps {
 	changeIndex?: number;
 	totalChanges?: number;
 	counterTestId?: string;
-	overlayInteractive?: boolean;
-	onOverlayLineClick?: (lineIndex: number) => void;
 }
 
 const DiffSidePane: React.FC<DiffSidePaneProps> = ({
@@ -95,8 +93,6 @@ const DiffSidePane: React.FC<DiffSidePaneProps> = ({
 	changeIndex = 0,
 	totalChanges = 0,
 	counterTestId,
-	overlayInteractive = false,
-	onOverlayLineClick,
 }) => {
 	const handlePointerDown = useCallback(
 		(e: React.PointerEvent<HTMLDivElement>) => {
@@ -264,8 +260,7 @@ const DiffSidePane: React.FC<DiffSidePaneProps> = ({
 						lineRoles={overlayRoles}
 						highlightLineIndex={highlightLineIndex ?? undefined}
 						highlightColor={highlightColor}
-						interactive={overlayInteractive}
-						onLineClick={onOverlayLineClick}
+						interactive={false}
 					/>
 				)}
 				<div

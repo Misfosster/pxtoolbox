@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import type { Step } from '../utils/diff/line';
 import { mergedSegments, type DiffSeg } from '../utils/diff/inline';
-import { stepKeyForMod, type ModResolution } from '../utils/diff/stepKey';
 
-export type OverlayLineRole = 'none' | 'add' | 'del' | 'resolved';
+export type OverlayLineRole = 'none' | 'add' | 'del';
 
 export interface OverlaySegments {
 	leftOverlayLines: DiffSeg[][];
@@ -18,10 +17,10 @@ interface UseOverlaySegmentsParams {
 	rightLines: string[];
 	ignoreWhitespace: boolean;
 	charLevel: boolean;
-	resolutions?: Record<string, ModResolution>;
 }
 
 const WHITESPACE_TOKEN = /^[\s\u200b\u200c\u200d\ufeff]*$/;
+const FORMAT_CHARS_RE = /[\u200b\u200c\u200d\ufeff]/g;
 
 function sanitizeSegment(seg: DiffSeg, ignoreWhitespace: boolean): DiffSeg {
 	if (!ignoreWhitespace) return seg;
@@ -34,7 +33,7 @@ function sanitizeSegment(seg: DiffSeg, ignoreWhitespace: boolean): DiffSeg {
 }
 
 function isWhitespaceOnlyLine(line: string): boolean {
-	return WHITESPACE_TOKEN.test(line);
+    return WHITESPACE_TOKEN.test(line);
 }
 
 export function useOverlaySegments({
@@ -43,7 +42,6 @@ export function useOverlaySegments({
 	rightLines,
 	ignoreWhitespace,
 	charLevel,
-	resolutions,
 }: UseOverlaySegmentsParams): OverlaySegments {
 	return useMemo(() => {
 		const leftArr: DiffSeg[][] = new Array(leftLines.length);
@@ -76,7 +74,6 @@ export function useOverlaySegments({
 						continue;
 					}
 					leftArr[li] = [{ text: lText, changed: true, diffType: 'del' }];
-					leftRoles[li] = 'del';
 				}
 				continue;
 			}
@@ -91,7 +88,6 @@ export function useOverlaySegments({
 						continue;
 					}
 					rightArr[rj] = [{ text: rText, changed: true, diffType: 'add' }];
-					rightRoles[rj] = 'add';
 				}
 				continue;
 			}
@@ -99,37 +95,16 @@ export function useOverlaySegments({
 			if (st.type === 'mod') {
 				const li = st.i ?? -1;
 				const rj = st.j ?? -1;
-				const aRaw = li >= 0 ? leftLines[li] ?? '' : '';
-				const bRaw = rj >= 0 ? rightLines[rj] ?? '' : '';
-				const key = stepKeyForMod(st.i, st.j);
-				const resolution = key && resolutions ? resolutions[key] : undefined;
+                const aRaw = li >= 0 ? leftLines[li] ?? '' : '';
+                const bRaw = rj >= 0 ? rightLines[rj] ?? '' : '';
 
-				if (resolution === 'keep-original') {
-					if (li >= 0) {
-						leftArr[li] = [{ text: aRaw, changed: false }];
-						leftRoles[li] = 'resolved';
-					}
-					if (rj >= 0) {
-						rightArr[rj] = [{ text: bRaw, changed: false }];
-						rightRoles[rj] = 'none';
-					}
-					continue;
-				}
+                // When ignoring whitespace, strip zero-width format characters so segmentation
+                // aligns with preview normalization and token indices match
+                const aSan = ignoreWhitespace ? aRaw.replace(FORMAT_CHARS_RE, '') : aRaw;
+                const bSan = ignoreWhitespace ? bRaw.replace(FORMAT_CHARS_RE, '') : bRaw;
 
-				if (resolution === 'keep-altered') {
-					if (li >= 0) {
-						leftArr[li] = [{ text: aRaw, changed: false }];
-						leftRoles[li] = 'none';
-					}
-					if (rj >= 0) {
-						rightArr[rj] = [{ text: bRaw, changed: false }];
-						rightRoles[rj] = 'resolved';
-					}
-					continue;
-				}
-
-				const segs = mergedSegments(aRaw, bRaw, {
-					ignoreWhitespace: false,
+                const segs = mergedSegments(aSan, bSan, {
+                    ignoreWhitespace: ignoreWhitespace,
 					mode: charLevel ? 'char' : 'word',
 				});
 
@@ -137,12 +112,10 @@ export function useOverlaySegments({
 					const leftSegs = segs
 						.filter((s) => !s.changed || s.diffType === 'del')
 						.map((seg) => sanitizeSegment(seg, ignoreWhitespace));
-					if (leftSegs.length === 0) {
-						leftSegs.push({ text: aRaw, changed: false });
+                    if (leftSegs.length === 0) {
+                        leftSegs.push({ text: aRaw, changed: false });
 					}
-					const leftHasChanges = leftSegs.some((seg) => seg.changed && seg.diffType === 'del');
 					leftArr[li] = leftSegs;
-					leftRoles[li] = leftHasChanges ? 'del' : 'none';
 					if (process.env.NODE_ENV !== 'production') {
 						const leftOverlayText = leftArr[li].map((s) => s.text).join('');
 						if (leftOverlayText !== aRaw) {
@@ -156,12 +129,10 @@ export function useOverlaySegments({
 					const rightSegs = segs
 						.filter((s) => !s.changed || s.diffType === 'add')
 						.map((seg) => sanitizeSegment(seg, ignoreWhitespace));
-					if (rightSegs.length === 0) {
-						rightSegs.push({ text: bRaw, changed: false });
+                    if (rightSegs.length === 0) {
+                        rightSegs.push({ text: bRaw, changed: false });
 					}
-					const rightHasChanges = rightSegs.some((seg) => seg.changed && seg.diffType === 'add');
 					rightArr[rj] = rightSegs;
-					rightRoles[rj] = rightHasChanges ? 'add' : 'none';
 					if (process.env.NODE_ENV !== 'production') {
 						const rightOverlayText = rightArr[rj].map((s) => s.text).join('');
 						if (rightOverlayText !== bRaw) {
@@ -173,15 +144,32 @@ export function useOverlaySegments({
 			}
 		}
 
+		const classifyRole = (segments: DiffSeg[] | undefined): OverlayLineRole => {
+			if (!segments || segments.length === 0) return 'none';
+			let hasAdd = false;
+			let hasDel = false;
+			for (const seg of segments) {
+				if (!seg || !seg.changed) continue;
+				if (seg.diffType === 'add') hasAdd = true;
+				if (seg.diffType === 'del') hasDel = true;
+			}
+			if (hasAdd && !hasDel) return 'add';
+			if (hasDel && !hasAdd) return 'del';
+			if (hasAdd && hasDel) return 'add';
+			return 'none';
+		};
+
 		for (let i = 0; i < leftArr.length; i++) {
 			if (!leftArr[i]) {
 				leftArr[i] = [{ text: leftLines[i] ?? '', changed: false }];
 			}
+			leftRoles[i] = classifyRole(leftArr[i]);
 		}
 		for (let j = 0; j < rightArr.length; j++) {
 			if (!rightArr[j]) {
 				rightArr[j] = [{ text: rightLines[j] ?? '', changed: false }];
 			}
+			rightRoles[j] = classifyRole(rightArr[j]);
 		}
 
 		return {
@@ -190,5 +178,5 @@ export function useOverlaySegments({
 			leftLineRoles: leftRoles,
 			rightLineRoles: rightRoles,
 		};
-	}, [steps, leftLines, rightLines, ignoreWhitespace, charLevel, resolutions]);
+	}, [steps, leftLines, rightLines, ignoreWhitespace, charLevel]);
 }
