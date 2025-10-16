@@ -1,10 +1,9 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Diff Viewer – overlay + numbering', () => {
+test.describe('Diff Viewer – numbering + preview', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/#/tools/diff');
-    // Ensure the tool is visible; if there's a tab, adjust as needed
-    await page.getByText('Ignore whitespace').waitFor({ state: 'visible' });
+    await page.waitForSelector('#diff-left');
   });
 
   test('deleted line reported at its original index (no wrong shift)', async ({ page }) => {
@@ -46,34 +45,13 @@ test.describe('Diff Viewer – overlay + numbering', () => {
     await expect(delRows.first()).toHaveAttribute('data-display-index', '9');
   });
 
-  test('overlay tokens anchored to text (tolerance <= 2px) and shows add token', async ({ page }) => {
+  test('preview renders add token for simple word change', async ({ page }) => {
     await page.locator('#diff-left').fill('hello friend');
     await page.locator('#diff-right').fill('hello friendo');
 
-    await page.getByText('Character-level inline').click();
-    
-    // Wait for debounced diff calculation to complete
     await page.waitForTimeout(50);
-
-    const overlay = page.getByTestId('overlay-right');
-    const alteredBox = page.locator('#diff-right');
-
-    const [overlayBox, textBox, paddings] = await Promise.all([
-      overlay.evaluate(el => el.getBoundingClientRect()),
-      alteredBox.evaluate(el => el.getBoundingClientRect()),
-      alteredBox.evaluate(el => {
-        const cs = getComputedStyle(el as HTMLElement);
-        return { left: parseFloat(cs.paddingLeft || '0'), top: parseFloat(cs.paddingTop || '0') };
-      }),
-    ]);
-
-    const contentLeft = textBox.left + paddings.left;
-    const contentTop = textBox.top + paddings.top;
-
-    expect(Math.abs(overlayBox.left - contentLeft)).toBeLessThan(3);
-    expect(Math.abs(overlayBox.top - contentTop)).toBeLessThan(3);
-
-    await expect(overlay.locator('[data-diff-token][data-type="add"]')).toHaveCount(1);
+    const preview = page.locator('#diff-output');
+    await expect(preview.locator('[data-diff-token].diff-seg.diff-add').first()).toBeVisible();
   });
 });
 

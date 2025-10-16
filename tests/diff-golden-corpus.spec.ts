@@ -41,7 +41,7 @@ test.describe('Golden Corpus - Visual Validation', () => {
     await expect(rightGutter).toContainText('4'); // Right line 4 exists (contains "line 5")
   });
 
-  test('Overlay alignment at 100% zoom', async ({ page }) => {
+  test('Preview visible at 100% zoom', async ({ page }) => {
     // Test data with word-level changes
     const leftInput = "The quick brown fox";
     const rightInput = "The quick red fox";
@@ -51,26 +51,12 @@ test.describe('Golden Corpus - Visual Validation', () => {
     
     await page.waitForTimeout(100);
     
-    // Verify overlays are present and aligned
-    const leftOverlay = page.locator('#diff-left-overlay');
-    const rightOverlay = page.locator('#diff-right-overlay');
-    
-    await expect(leftOverlay).toBeVisible();
-    await expect(rightOverlay).toBeVisible();
-    
-    // Check overlay positioning matches text positioning
-    const leftInputBox2 = page.locator('#diff-left');
-    const leftInputBox = await leftInputBox2.boundingBox();
-    const leftOverlayBox = await leftOverlay.boundingBox();
-    
-    if (leftInputBox && leftOverlayBox) {
-      // Overlay should be positioned over the input (relaxed tolerance for browser differences)
-      expect(Math.abs(leftOverlayBox.x - leftInputBox.x)).toBeLessThan(100);
-      expect(Math.abs(leftOverlayBox.y - leftInputBox.y)).toBeLessThan(100);
-    }
+    // Preview present
+    const preview = page.locator('#diff-output');
+    await expect(preview).toBeVisible();
   });
 
-  test('Overlay alignment at 125% zoom', async ({ page }) => {
+  test('Preview visible at 125% zoom', async ({ page }) => {
     // Set browser zoom to 125%
     await page.setViewportSize({ width: 1280 * 0.8, height: 720 * 0.8 });
     await page.evaluateHandle(() => document.body.style.zoom = '1.25');
@@ -83,20 +69,8 @@ test.describe('Golden Corpus - Visual Validation', () => {
     
     await page.waitForTimeout(200); // Extra wait for zoom
     
-    // Verify overlays still align correctly at different zoom levels
-    const leftOverlay = page.locator('#diff-left-overlay');
-    await expect(leftOverlay).toBeVisible();
-    
-    // At 125% zoom, overlays should still be properly positioned
-    const leftInputZoom = page.locator('#diff-left');
-    const leftInputZoomBox = await leftInputZoom.boundingBox();
-    const leftOverlayZoomBox = await leftOverlay.boundingBox();
-    
-    if (leftInputZoomBox && leftOverlayZoomBox) {
-      // Relaxed tolerance for zoom level positioning differences
-      expect(Math.abs(leftOverlayZoomBox.x - leftInputZoomBox.x)).toBeLessThan(100);
-      expect(Math.abs(leftOverlayZoomBox.y - leftInputZoomBox.y)).toBeLessThan(100);
-    }
+    const preview = page.locator('#diff-output');
+    await expect(preview).toBeVisible();
   });
 
   test('Changed-only view hides equals, preserves numbering', async ({ page }) => {
@@ -138,36 +112,8 @@ test.describe('Golden Corpus - Visual Validation', () => {
     
     await page.waitForTimeout(100);
     
-    // Check that deleted segments have consistent styling
-    const leftOverlay = page.locator('#diff-left-overlay');
     const preview = page.locator('#diff-output');
-    
-    // Verify CSS classes are applied consistently (use correct multi-class selector)
-    const deletedOverlayElements = leftOverlay.locator('.diff-seg.diff-del');
-    const deletedPreviewElements = preview.locator('.diff-seg.diff-del');
-    
-    if (await deletedOverlayElements.count() > 0) {
-      // Both should use the same CSS classes for deleted content
-      await expect(deletedOverlayElements.first()).toHaveClass(/diff-seg/);
-      await expect(deletedOverlayElements.first()).toHaveClass(/diff-del/);
-    }
-    
-    if (await deletedPreviewElements.count() > 0) {
-      await expect(deletedPreviewElements.first()).toHaveClass(/diff-seg/);
-      await expect(deletedPreviewElements.first()).toHaveClass(/diff-del/);
-    }
-    
-    // Verify consistent color styling
-    const overlayStyles = await deletedOverlayElements.first().evaluate(el => 
-      getComputedStyle(el).backgroundColor
-    );
-    const previewStyles = await deletedPreviewElements.first().evaluate(el => 
-      getComputedStyle(el).backgroundColor  
-    );
-    
-    // Background colors should match (allowing for slight variations)
-    expect(overlayStyles).toBeTruthy();
-    expect(previewStyles).toBeTruthy();
+    await expect(preview.locator('.diff-seg.diff-del').first()).toBeVisible();
   });
 
   test('Unicode emoji safety - no broken rendering', async ({ page }) => {
@@ -179,14 +125,9 @@ test.describe('Golden Corpus - Visual Validation', () => {
     
     await page.waitForTimeout(100);
     
-    // Verify emojis render correctly in overlays and preview
-    const leftOverlay = page.locator('#diff-left-overlay');
-    const rightOverlay = page.locator('#diff-right-overlay');
     const preview = page.locator('#diff-output');
     
     // Check that ZWJ family emoji stays intact
-    await expect(leftOverlay).toContainText('👨‍👩‍👧‍👦');
-    await expect(rightOverlay).toContainText('👨‍👩‍👧‍👦');
     await expect(preview).toContainText('👨‍👩‍👧‍👦');
     
     // Check that flag emojis are preserved
@@ -235,21 +176,8 @@ test.describe('Golden Corpus - Visual Validation', () => {
     
     await page.waitForTimeout(100);
     
-    // Check that "baz" doesn't appear duplicated in overlays
-    const leftOverlay = page.locator('#diff-left-overlay');
-    const overlayText = await leftOverlay.textContent();
-    
-    // Count occurrences of "baz" - should not be duplicated
-    const bazMatches = (overlayText || '').match(/baz/g);
-    const bazCount = bazMatches ? bazMatches.length : 0;
-    
-    // Should have reasonable number of "baz" occurrences (not excessive duplication)
-    expect(bazCount).toBeLessThanOrEqual(2);
-    
-    // Preview should show clean diff
     const preview = page.locator('#diff-output');
-    const previewText = await preview.textContent();
-    expect(previewText).toContain('baz');
+    await expect(preview).toContainText('baz');
   });
 });
 

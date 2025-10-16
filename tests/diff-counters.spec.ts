@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Diff Viewer – counters and changed-only preview', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/#/tools/diff');
-    await page.getByText('Ignore whitespace').waitFor({ state: 'visible' });
+    await page.waitForSelector('#diff-left');
   });
 
   test('shows + / - / ~ counters for line changes', async ({ page }) => {
@@ -16,7 +16,7 @@ test.describe('Diff Viewer – counters and changed-only preview', () => {
     await expect(counters).toBeVisible();
     await expect(counters.getByTestId('count-add')).toHaveText('+1');
     await expect(counters.getByTestId('count-del')).toHaveText('-1');
-    await expect(counters.getByTestId('count-mod')).toHaveText('?1');
+    await expect(counters.getByTestId('count-mod')).toHaveText('~1');
   });
 
   test('changed-only preview hides unchanged lines', async ({ page }) => {

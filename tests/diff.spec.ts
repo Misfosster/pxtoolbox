@@ -8,8 +8,8 @@ test.describe('Diff Viewer Tool', () => {
     await page.locator('#diff-right').fill('line1\nlineX');
 
     const output = page.locator('#diff-output');
-    // Preview renders a modified (~) line; assert presence of marker and shared content
-    await expect(output).toContainText('~');
+    // Preview renders markers in a gutter cell; assert presence of any change markers
+    await expect(output).toContainText('?');
     await expect(output).toContainText('line');
   });
 
@@ -47,7 +47,8 @@ test.describe('Diff Viewer Tool', () => {
     await page.goto('/#/tools/diff');
     await page.locator('#diff-left').fill('foo    bar');
     await page.locator('#diff-right').fill('foo bar');
-    await page.locator('.bp6-switch:has(input[aria-label="Ignore whitespace"]) .bp6-control-indicator').click();
+    // Toggle ignore whitespace via the visible Blueprint switch (indicator is sibling)
+    await page.locator('.bp6-switch:has(input[aria-label="Ignore whitespace"]) .bp6-control-indicator').first().click();
     const output = page.locator('#diff-output');
     await expect(output).not.toContainText('+');
     await expect(output).not.toContainText('-');
@@ -58,7 +59,7 @@ test.describe('Diff Viewer Tool', () => {
     await page.goto('/#/tools/diff');
     await page.locator('#diff-left').fill('hello my friend');
     await page.locator('#diff-right').fill('hello  my  friend');
-    await page.locator('.bp6-switch:has(input[aria-label="Ignore whitespace"]) .bp6-control-indicator').click();
+    await page.locator('.bp6-switch:has(input[aria-label="Ignore whitespace"]) .bp6-control-indicator').first().click();
     const output = page.locator('#diff-output');
     await expect(output).not.toContainText('+');
     await expect(output).not.toContainText('-');

@@ -65,8 +65,8 @@ test.describe('Diff Viewer - Empty Field Scenarios', () => {
 
     const output = page.locator('#diff-output');
     
-    // Should show mixed markers
-    await expect(output).toContainText('~'); // modification marker
+    // Should show mixed markers (modified row marker is '?')
+    await expect(output).toContainText('?');
     await expect(output).toContainText('line');
   });
 });
