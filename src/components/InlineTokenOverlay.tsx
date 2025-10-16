@@ -56,7 +56,18 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
 	interactive = false,
 	onLineClick,
 }) => {
-    const lines = useMemo(() => segmentsPerLine, [segmentsPerLine]);
+	const lines = useMemo(() => segmentsPerLine, [segmentsPerLine]);
+	const baseBodyStyle: React.CSSProperties = {
+		display: 'inline-flex',
+		alignItems: 'center',
+		gap: 4,
+		width: '100%',
+		whiteSpace: 'pre-wrap',
+		wordBreak: 'break-word' as const,
+		overflowWrap: 'anywhere' as const,
+		minWidth: 0,
+	};
+
     return (
         <div
             id={id}
@@ -90,6 +101,23 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
                 const lineRole = lineRoles[li] || 'none';
                 const tintClass = lineRole !== 'none' ? `diff-row-tint ${lineRole}` : '';
                 const isHighlighted = typeof highlightLineIndex === 'number' && highlightLineIndex === li;
+				const lineStyle: React.CSSProperties = {
+					width: '100%',
+					display: 'inline-flex',
+					alignItems: 'center',
+					gap: 4,
+					...(interactive ? { cursor: 'pointer' } : {}),
+				};
+				const bodyStyle: React.CSSProperties =
+					lineRole !== 'none'
+						? {
+								...baseBodyStyle,
+								backgroundColor:
+									lineRole === 'add'
+										? `var(--diff-add-row-bg, rgba(34, 197, 94, ${tintOpacity}))`
+										: `var(--diff-del-row-bg, rgba(239, 68, 68, ${tintOpacity}))`,
+						  }
+						: baseBodyStyle;
                 
                 return (
                     <div
@@ -97,7 +125,7 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
                         data-line-index={li}
                         className={`relative ${tintClass}`}
                         onClick={interactive ? () => onLineClick?.(li) : undefined}
-                        style={interactive ? { cursor: 'pointer' } : undefined}
+                        style={lineStyle}
                     >
                         {/* Focus highlight */}
                         {isHighlighted && (
@@ -118,14 +146,32 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
                             />
                         )}
                         {/* Token highlights */}
-                        {line.map((seg, si) => {
-                            const show = seg.changed ? ((seg.diffType === 'add' && showAdd) || (seg.diffType === 'del' && showDel)) : true;
-                            const className = seg.changed && show ? (seg.diffType === 'add' ? 'diff-seg diff-add' : 'diff-seg diff-del') : undefined;
-                            const style = className ? undefined : { color: 'transparent' as const };
-                            return (
-                                <span key={si} className={className} style={style} data-diff-token data-type={seg.changed ? (seg.diffType === 'add' ? 'add' : 'del') : 'eq'}>{seg.text || ' '}</span>
-                            );
-                        })}
+                        <span className={lineRole !== 'none' ? 'overlay-line-body' : undefined} style={bodyStyle}>
+							{line.map((seg, si) => {
+								const show = seg.changed
+									? (seg.diffType === 'add' && showAdd) || (seg.diffType === 'del' && showDel)
+									: true;
+								const className = seg.changed && show ? (seg.diffType === 'add' ? 'diff-seg diff-add' : 'diff-seg diff-del') : undefined;
+								const style = className
+									? {
+											whiteSpace: 'pre-wrap',
+											wordBreak: 'break-word' as const,
+											overflowWrap: 'anywhere' as const,
+									  }
+									: { color: 'transparent' as const };
+								return (
+									<span
+										key={si}
+										className={className}
+										style={style}
+										data-diff-token
+										data-type={seg.changed ? (seg.diffType === 'add' ? 'add' : 'del') : 'eq'}
+									>
+										{seg.text || ' '}
+									</span>
+								);
+							})}
+                        </span>
                     </div>
                 );
             })}

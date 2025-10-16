@@ -99,7 +99,15 @@ function injectMarkersIntoText(text: string, markers: FormatMarker[], style?: 'i
 					lineHeight: '1.4',
 					letterSpacing: 0.4,
 					userSelect: 'none',
-				}}
+				  
+					// critical for proper wrapping inside flex
+					minWidth: 0,
+					whiteSpace: 'pre-wrap',
+					wordBreak: 'break-word',
+					overflowWrap: 'anywhere',
+				  }}
+				  
+								
 			>
 				{marker.label}
 			</span>,
@@ -286,6 +294,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 							gap: 6,
 							color: 'rgba(138,155,168,0.7)',
 							userSelect: 'none',
+							minWidth: 0,
 						}}
 					>
                         <span style={{ width: 14, textAlign: 'center' }}>{markerLabel}</span>
@@ -391,17 +400,17 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 						}}
 					>
 						<span
-							style={{
-								display: 'inline-flex',
-								alignItems: 'center',
-								gap: 4,
-								width: '100%',
-								whiteSpace: 'pre-wrap',
-								wordBreak: 'break-word',
-								overflowWrap: 'anywhere',
-							}}
-							data-change={change}
-						>
+						style={{
+							alignItems: 'center',
+							gap: 4,
+							width: '100%',
+							whiteSpace: 'pre-wrap',
+							wordBreak: 'break-word',
+							overflowWrap: 'anywhere',
+							minWidth: 0,
+						}}
+						data-change={change}
+					>
 							{segments.length > 0
 								? segments.map((seg, idx) => (
 										<span

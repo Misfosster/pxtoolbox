@@ -34,4 +34,15 @@
 .diff-line[data-resolved] .diff-seg.diff-add,
 .diff-line[data-resolved] .diff-seg.diff-del{ background:transparent; }
 
+.overlay-line-body{
+  display:inline-flex;
+  align-items:center;
+  gap:4px;
+  width:100%;
+  white-space:pre-wrap;
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  min-width:0;
+}
+
 
