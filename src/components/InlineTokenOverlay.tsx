@@ -27,6 +27,10 @@ export interface InlineTokenOverlayProps {
 	highlightLineIndex?: number;
 	/** Highlight fill color */
 	highlightColor?: string;
+	/** Enable pointer interactions on lines for resolve mode */
+	interactive?: boolean;
+	/** Called when a line is clicked (index relative to segmentsPerLine) */
+	onLineClick?: (lineIndex: number) => void;
 }
 
 const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
@@ -49,6 +53,8 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
 	id,
 	highlightLineIndex,
 	highlightColor = 'rgba(255, 215, 0, 0.35)',
+	interactive = false,
+	onLineClick,
 }) => {
     const lines = useMemo(() => segmentsPerLine, [segmentsPerLine]);
     return (
@@ -64,7 +70,7 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
                 width: contentWidthPx ? `${contentWidthPx}px` : undefined,
                 top: topOffsetPx,
                 transform: `translateY(${-scrollTop}px)`,
-                pointerEvents: 'none',
+                pointerEvents: interactive ? 'auto' : 'none',
                 zIndex: 1,
                 fontFamily: fontFamily || 'var(--diff-font, inherit)',
                 fontSize: fontSize || 'inherit',
@@ -86,7 +92,13 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
                 const isHighlighted = typeof highlightLineIndex === 'number' && highlightLineIndex === li;
                 
                 return (
-                    <div key={li} data-line-index={li} className={`relative ${tintClass}`}>
+                    <div
+                        key={li}
+                        data-line-index={li}
+                        className={`relative ${tintClass}`}
+                        onClick={interactive ? () => onLineClick?.(li) : undefined}
+                        style={interactive ? { cursor: 'pointer' } : undefined}
+                    >
                         {/* Focus highlight */}
                         {isHighlighted && (
                             <div
@@ -96,12 +108,22 @@ const InlineTokenOverlay: React.FC<InlineTokenOverlayProps> = ({
                         )}
                         {/* Line tint background */}
                         {lineRole !== 'none' && (
-                            <div 
+                            <div
                                 className="absolute inset-0 -z-10"
-                                style={{ 
-                                    backgroundColor: lineRole === 'add' 
-                                        ? `var(--diff-add-row-bg, rgba(34, 197, 94, ${tintOpacity}))` 
-                                        : `var(--diff-del-row-bg, rgba(239, 68, 68, ${tintOpacity}))` 
+                                style={{
+                                    backgroundColor: (() => {
+                                        if (lineRole === 'add') {
+                                            return `var(--diff-add-row-bg, rgba(34, 197, 94, ${tintOpacity}))`;
+                                        }
+                                        if (lineRole === 'del') {
+                                            return `var(--diff-del-row-bg, rgba(239, 68, 68, ${tintOpacity}))`;
+                                        }
+                                        if (lineRole === 'resolved') {
+                                            const resolvedOpacity = Math.min(0.5, tintOpacity + 0.15);
+                                            return `var(--diff-resolved-row-bg, rgba(139, 92, 246, ${resolvedOpacity}))`;
+                                        }
+                                        return undefined;
+                                    })(),
                                 }}
                             />
                         )}

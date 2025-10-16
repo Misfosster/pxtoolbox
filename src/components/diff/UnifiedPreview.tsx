@@ -3,6 +3,8 @@ import { Switch } from '@blueprintjs/core';
 import Field from '../ui/Field';
 import type { Step } from '../../utils/diff/line';
 import { mergedSegments, type DiffSeg } from '../../utils/diff/inline';
+import { normalizePlaintext } from '../../utils/text/normalize';
+import { stepKeyForMod, type ModResolution } from '../../utils/diff/stepKey';
 
 export interface UnifiedPreviewProps {
 	id?: string;
@@ -18,28 +20,46 @@ export interface UnifiedPreviewProps {
 	formatPreview: boolean;
 	charLevel: boolean;
 	changedOnly: boolean;
+	resolutions?: Record<string, ModResolution>;
 	onChangedOnlyChange: (value: boolean) => void;
 	onFormatPreviewChange: (value: boolean) => void;
 }
 
 const MUTED_COLOR = 'var(--diff-fg-muted, rgba(191, 204, 214, 0.85))';
-const ZERO_WIDTH_RE = /[\u200b\u200c\u200d\ufeff]/g;
-const MULTIPLE_SPACE_RE = / {2,}/g;
 
-function formatTextForPreview(text: string, format: boolean): { display: string; whitespaceOnly: boolean } {
-	if (!format || !text) {
-		return { display: text, whitespaceOnly: !text || text.trim().length === 0 };
+function formatDisplayValue(text: string): { display: string; whitespaceOnly: boolean } {
+	const display = text;
+	return { display, whitespaceOnly: display.trim().length === 0 };
+}
+
+function preparePreviewText(text: string, normalize: boolean): { display: string; whitespaceOnly: boolean } {
+	const source = text ?? '';
+	if (!normalize) {
+		return formatDisplayValue(source);
 	}
-	const sanitized = text.replace(ZERO_WIDTH_RE, '');
-	const leadingWhitespaceMatch = sanitized.match(/^[\t ]*/);
-	const leadingWhitespace = leadingWhitespaceMatch ? leadingWhitespaceMatch[0] : '';
-	let rest = sanitized.slice(leadingWhitespace.length);
-	rest = rest.replace(MULTIPLE_SPACE_RE, ' ');
-	rest = rest.replace(/ +$/g, '');
-	const combined = leadingWhitespace + rest;
+	return formatDisplayValue(normalizePlaintext(source));
+}
+
+function tryParseJson(text: string): unknown | null {
+	if (!text) {
+		return null;
+	}
+	try {
+		return JSON.parse(text);
+	} catch {
+		return null;
+	}
+}
+
+function formatJsonPair(left: string, right: string): { left: string; right: string } | null {
+	const leftParsed = tryParseJson(left);
+	if (leftParsed === null) return null;
+	const rightParsed = tryParseJson(right);
+	if (rightParsed === null) return null;
+
 	return {
-		display: combined,
-		whitespaceOnly: combined.trim().length === 0,
+		left: JSON.stringify(leftParsed, null, 2),
+		right: JSON.stringify(rightParsed, null, 2),
 	};
 }
 
@@ -47,15 +67,16 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 	id = 'diff-output',
 	height,
 	steps,
-leftText,
-rightText,
-leftLines,
-rightLines,
-leftNums,
+	leftText,
+	rightText,
+	leftLines,
+	rightLines,
+	leftNums,
 	rightNums,
-formatPreview,
-charLevel,
-changedOnly,
+	formatPreview,
+	charLevel,
+	changedOnly,
+	resolutions,
 	onChangedOnlyChange,
 	onFormatPreviewChange,
 }) => {
@@ -87,13 +108,26 @@ changedOnly,
 		let add = 0;
 		let del = 0;
 		let mod = 0;
-		for (const step of displaySteps) {
-			if (step.type === 'add') add++;
-			else if (step.type === 'del') del++;
-			else if (step.type === 'mod') mod++;
+		for (let idx = 0; idx < displaySteps.length; idx++) {
+			const step = displaySteps[idx];
+			if (step.type === 'add') {
+				add++;
+				continue;
+			}
+			if (step.type === 'del') {
+				del++;
+				continue;
+			}
+			if (step.type === 'mod') {
+				const key = stepKeyForMod(step.i, step.j);
+				if (key && resolutions && resolutions[key]) {
+					continue;
+				}
+				mod++;
+			}
 		}
 		return { add, del, mod };
-	}, [displaySteps]);
+	}, [displaySteps, resolutions]);
 
 	const rows = useMemo(() => {
 		let lastRenderedWhitespace = false;
@@ -106,12 +140,24 @@ changedOnly,
 			marker: '+' | '-' | ' ' | '~',
 			content: string,
 			segments?: LocalSeg[],
+			resolved?: ModResolution,
 		) => {
 			const isAdd = marker === '+';
 			const isDel = marker === '-';
 			const isMod = marker === '~';
-			const cls = isAdd ? 'diff-line add' : isDel ? 'diff-line del' : isMod ? 'diff-line mod' : 'diff-line';
-			const bg = isAdd
+			const isResolved = Boolean(resolved);
+			const cls = isResolved
+				? 'diff-line resolved'
+				: isAdd
+				? 'diff-line add'
+				: isDel
+				? 'diff-line del'
+				: isMod
+				? 'diff-line mod'
+				: 'diff-line';
+			const bg = isResolved
+				? 'var(--diff-resolved-bg, rgba(139, 92, 246, 0.18))'
+				: isAdd
 				? 'var(--diff-add-bg)'
 				: isDel
 				? 'var(--diff-del-bg)'
@@ -125,6 +171,7 @@ changedOnly,
 					data-preview-line
 					data-marker={marker}
 					data-display-index={displayNum}
+					data-resolved={resolved}
 					className={cls}
 					style={{ padding: '0 6px 0 0', color: MUTED_COLOR, background: bg }}
 				>
@@ -169,7 +216,7 @@ changedOnly,
 			if (step.type === 'same') {
 				const displayNum = displayLeftNums[idx] || (step.i ?? 0) + 1;
 				const contentRaw = step.i != null ? leftLines[step.i] ?? '' : '';
-				const { display: content, whitespaceOnly } = formatTextForPreview(contentRaw, formatPreview);
+				const { display: content, whitespaceOnly } = preparePreviewText(contentRaw, formatPreview);
 				const isWhitespaceRow = formatPreview && whitespaceOnly;
 				if (formatPreview && isWhitespaceRow && lastRenderedWhitespace) {
 					continue;
@@ -182,7 +229,7 @@ changedOnly,
 			if (step.type === 'del') {
 				const displayNum = displayLeftNums[idx] || (step.i ?? 0) + 1;
 				const contentRaw = step.i != null ? leftLines[step.i] ?? '' : '';
-				const { display: content, whitespaceOnly } = formatTextForPreview(contentRaw, formatPreview);
+				const { display: content, whitespaceOnly } = preparePreviewText(contentRaw, formatPreview);
 				const isWhitespaceRow = formatPreview && whitespaceOnly;
 				if (formatPreview && isWhitespaceRow && lastRenderedWhitespace) {
 					continue;
@@ -195,7 +242,7 @@ changedOnly,
 			if (step.type === 'add') {
 				const displayNum = displayRightNums[idx] || (step.j ?? 0) + 1;
 				const contentRaw = step.j != null ? rightLines[step.j] ?? '' : '';
-				const { display: content, whitespaceOnly } = formatTextForPreview(contentRaw, formatPreview);
+				const { display: content, whitespaceOnly } = preparePreviewText(contentRaw, formatPreview);
 				const isWhitespaceRow = formatPreview && whitespaceOnly;
 				if (formatPreview && isWhitespaceRow && lastRenderedWhitespace) {
 					continue;
@@ -206,11 +253,48 @@ changedOnly,
 			}
 
 			if (step.type === 'mod') {
-				const displayNum = displayLeftNums[idx] || (step.i ?? 0) + 1;
 				const aRaw = step.i != null ? leftLines[step.i] ?? '' : '';
 				const bRaw = step.j != null ? rightLines[step.j] ?? '' : '';
-				const leftFormatted = formatTextForPreview(aRaw, formatPreview);
-				const rightFormatted = formatTextForPreview(bRaw, formatPreview);
+				let leftFormatted = preparePreviewText(aRaw, formatPreview);
+				let rightFormatted = preparePreviewText(bRaw, formatPreview);
+
+				if (formatPreview) {
+					const jsonPair = formatJsonPair(aRaw, bRaw);
+					if (jsonPair) {
+						leftFormatted = formatDisplayValue(jsonPair.left);
+						rightFormatted = formatDisplayValue(jsonPair.right);
+					}
+				}
+
+				const key = stepKeyForMod(step.i, step.j);
+				const resolution = key && resolutions ? resolutions[key] : undefined;
+
+				if (resolution) {
+					if (changedOnly) {
+						continue;
+					}
+					const resolvedFormatted = resolution === 'keep-original' ? leftFormatted : rightFormatted;
+					const displayNum =
+						resolution === 'keep-altered'
+							? displayRightNums[idx] || (step.j ?? 0) + 1
+							: displayLeftNums[idx] || (step.i ?? 0) + 1;
+					const isWhitespaceRow = formatPreview && resolvedFormatted.whitespaceOnly;
+					if (formatPreview && isWhitespaceRow && lastRenderedWhitespace) {
+						continue;
+					}
+					lastRenderedWhitespace = isWhitespaceRow;
+					rowNodes.push(
+						renderLine(
+							`mod-${idx}-resolved`,
+							displayNum,
+							' ',
+							resolvedFormatted.display,
+							undefined,
+							resolution,
+						),
+					);
+					continue;
+				}
 
 				const leftDiffSource = formatPreview ? leftFormatted.display : aRaw;
 				const rightDiffSource = formatPreview ? rightFormatted.display : bRaw;
@@ -239,12 +323,12 @@ changedOnly,
 					continue;
 				}
 				lastRenderedWhitespace = isWhitespaceRow;
-				rowNodes.push(renderLine(`mod-${idx}`, displayNum, marker, content, segs));
+				rowNodes.push(renderLine(`mod-${idx}`, displayLeftNums[idx] || (step.i ?? 0) + 1, marker, content, segs));
 			}
 		}
 
 		return rowNodes;
-	}, [steps, changedOnly, leftNums, rightNums, leftLines, rightLines, formatPreview, charLevel]);
+	}, [steps, changedOnly, leftNums, rightNums, leftLines, rightLines, formatPreview, charLevel, resolutions]);
 
 	return (
 		<Field label="Unified diff (preview)" inputId={id}>
@@ -270,15 +354,15 @@ changedOnly,
 				</span>
 				<span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
 					<span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>
-						Reformat preview
+						Normalize preview
 					</span>
 					<Switch
 						checked={formatPreview}
 						onChange={(event) => onFormatPreviewChange((event.currentTarget as HTMLInputElement).checked)}
-						aria-label="Reformat preview"
+						aria-label="Normalize preview"
 						label={undefined}
 						style={{ margin: 0 }}
-						data-testid="toggle-format-preview"
+						data-testid="toggle-normalize-preview"
 					/>
 				</span>
 			</div>

@@ -10,6 +10,7 @@ import { useOverlaySegments } from '../hooks/useOverlaySegments';
 import { useDiffNavigation } from '../hooks/useDiffNavigation';
 import DiffSidePane from '../components/diff/DiffSidePane';
 import UnifiedPreview from '../components/diff/UnifiedPreview';
+import { stepKeyForMod, type ModResolution } from '../utils/diff/stepKey';
 
 const WHITESPACE_ONLY_RE = /^[\s\u200b\u200c\u200d\ufeff]*$/;
 
@@ -41,6 +42,8 @@ const DiffViewerTool: React.FC = () => {
     true,
   );
   const [formatPreview, setFormatPreview] = useLocalStorageBoolean('pxtoolbox.diff.formatPreview', false);
+  const [resolveMode, setResolveMode] = useState(false);
+  const [resolutions, setResolutions] = useState<Record<string, ModResolution>>({});
   const [activePane, setActivePane] = useState<'left' | 'right'>('left');
   const [leftScrollTop, setLeftScrollTop] = useState<number>(0);
   const [rightScrollTop, setRightScrollTop] = useState<number>(0);
@@ -186,6 +189,30 @@ const DiffViewerTool: React.FC = () => {
 
   const { steps, leftNums, rightNums } = filteredAlignment;
 
+  const { leftLineToStepIndex, rightLineToStepIndex, modStepKeys } = useMemo(() => {
+    const leftMap: Array<number | undefined> = [];
+    const rightMap: Array<number | undefined> = [];
+    const keys: string[] = [];
+
+    steps.forEach((step, idx) => {
+      if (step.type !== 'mod') {
+        return;
+      }
+      if (typeof step.i === 'number') {
+        leftMap[step.i] = idx;
+      }
+      if (typeof step.j === 'number') {
+        rightMap[step.j] = idx;
+      }
+      const key = stepKeyForMod(step.i, step.j);
+      if (key) {
+        keys.push(key);
+      }
+    });
+
+    return { leftLineToStepIndex: leftMap, rightLineToStepIndex: rightMap, modStepKeys: keys };
+  }, [steps]);
+
   // Build inline overlay segments and line roles per side mapped to ACTUAL lines per side (no placeholder rows)
   const { leftOverlayLines, rightOverlayLines, leftLineRoles, rightLineRoles } = useOverlaySegments({
     steps,
@@ -193,7 +220,39 @@ const DiffViewerTool: React.FC = () => {
     rightLines,
     ignoreWhitespace: debIgnoreWs,
     charLevel: debCharInline,
+    resolutions,
   });
+
+  useEffect(() => {
+    if (!modStepKeys.length) {
+      setResolutions((prev) => {
+        if (Object.keys(prev).length === 0) {
+          return prev;
+        }
+        return {};
+      });
+      return;
+    }
+    const valid = new Set(modStepKeys);
+    setResolutions((prev) => {
+      if (Object.keys(prev).length === 0) {
+        return prev;
+      }
+      let changed = false;
+      const next: Record<string, ModResolution> = {};
+      Object.entries(prev).forEach(([key, value]) => {
+        if (valid.has(key)) {
+          next[key] = value;
+        } else {
+          changed = true;
+        }
+      });
+      if (!changed && Object.keys(next).length === Object.keys(prev).length) {
+        return prev;
+      }
+      return next;
+    });
+  }, [modStepKeys]);
 
   const { left: leftNav, right: rightNav } = useDiffNavigation({
     steps,
@@ -262,6 +321,57 @@ const DiffViewerTool: React.FC = () => {
       }
     };
   }, []);
+
+  const toggleResolutionForStep = useCallback(
+    (stepIndex: number, side: 'left' | 'right') => {
+      const step = steps[stepIndex];
+      if (!step || step.type !== 'mod') {
+        return;
+      }
+      const key = stepKeyForMod(step.i, step.j);
+      if (!key) {
+        return;
+      }
+      const nextValue: ModResolution = side === 'left' ? 'keep-original' : 'keep-altered';
+      setResolutions((prev) => {
+        const prevValue = prev[key];
+        if (prevValue === nextValue) {
+          const { [key]: _removed, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, [key]: nextValue };
+      });
+    },
+    [steps],
+  );
+
+  const handleLeftOverlayLineClick = useCallback(
+    (lineIndex: number) => {
+      if (!resolveMode) {
+        return;
+      }
+      const stepIndex = leftLineToStepIndex[lineIndex];
+      if (typeof stepIndex !== 'number') {
+        return;
+      }
+      toggleResolutionForStep(stepIndex, 'left');
+    },
+    [resolveMode, leftLineToStepIndex, toggleResolutionForStep],
+  );
+
+  const handleRightOverlayLineClick = useCallback(
+    (lineIndex: number) => {
+      if (!resolveMode) {
+        return;
+      }
+      const stepIndex = rightLineToStepIndex[lineIndex];
+      if (typeof stepIndex !== 'number') {
+        return;
+      }
+      toggleResolutionForStep(stepIndex, 'right');
+    },
+    [resolveMode, rightLineToStepIndex, toggleResolutionForStep],
+  );
 
   const navigate = useCallback(
     (side: 'left' | 'right', direction: 'next' | 'prev', allowFallback = false) => {
@@ -345,6 +455,17 @@ const DiffViewerTool: React.FC = () => {
             <Switch checked={alteredOnly} onChange={(e) => setAlteredOnly((e.currentTarget as HTMLInputElement).checked)} aria-label="Altered only" label={undefined} style={{ margin: 0 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>Resolve mode</span>
+            <Switch
+              checked={resolveMode}
+              onChange={(event) => setResolveMode((event.currentTarget as HTMLInputElement).checked)}
+              aria-label="Resolve mode"
+              label={undefined}
+              style={{ margin: 0 }}
+              data-testid="toggle-resolve-mode"
+            />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>Show unified preview</span>
             <Switch
               checked={showUnifiedPreview}
@@ -395,6 +516,8 @@ const DiffViewerTool: React.FC = () => {
               totalChanges={leftTotalChanges}
               highlightLineIndex={leftHighlightLine}
               counterTestId="left-change-counter"
+              overlayInteractive={resolveMode}
+              onOverlayLineClick={handleLeftOverlayLineClick}
             />
           </div>
           <div style={{ flex: '1 1 600px', minWidth: 480 }}>
@@ -435,6 +558,8 @@ const DiffViewerTool: React.FC = () => {
               totalChanges={rightTotalChanges}
               highlightLineIndex={rightHighlightLine}
               counterTestId="right-change-counter"
+              overlayInteractive={resolveMode}
+              onOverlayLineClick={handleRightOverlayLineClick}
             />
           </div>
         </div>
@@ -455,6 +580,7 @@ const DiffViewerTool: React.FC = () => {
                 formatPreview={formatPreview}
                 charLevel={debCharInline}
                 changedOnly={changedOnlyPreview}
+                resolutions={resolutions}
                 onChangedOnlyChange={setChangedOnlyPreview}
                 onFormatPreviewChange={setFormatPreview}
               />
@@ -462,7 +588,20 @@ const DiffViewerTool: React.FC = () => {
           </div>
         )}
         <div className="card-bottom" style={{ justifyItems: 'start' }}>
-          <Button icon="eraser" onClick={() => { setLeftText(''); setRightText(''); setLeftCollapsed(false); setRightCollapsed(false); }} disabled={!leftText && !rightText}>Clear</Button>
+          <Button
+            icon="eraser"
+            onClick={() => {
+              setLeftText('');
+              setRightText('');
+              setLeftCollapsed(false);
+              setRightCollapsed(false);
+              setResolutions({});
+              setResolveMode(false);
+            }}
+            disabled={!leftText && !rightText}
+          >
+            Clear
+          </Button>
         </div>
       </Card>
     </ToolShell>
@@ -470,4 +609,3 @@ const DiffViewerTool: React.FC = () => {
 };
 
 export default DiffViewerTool;
-

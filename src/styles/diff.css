@@ -4,6 +4,8 @@
   --diff-add-bg: rgba(46,160,67,.10);
   --diff-del-bg: rgba(248,81,73,.10);
   --diff-mod-bg: rgba(100,148,237,.14);
+  --diff-resolved-bg: rgba(139,92,246,.18);
+  --diff-resolved-row-bg: rgba(139,92,246,.24);
   /* token bg colors */
   --diff-token-add-bg: rgba(46,160,67,.55);
   --diff-token-del-bg: rgba(248,81,73,.55);
@@ -22,11 +24,14 @@
 .diff-line.add{ background:var(--diff-add-bg); color:var(--diff-fg-muted); }
 .diff-line.del{ background:var(--diff-del-bg); color:var(--diff-fg-muted); }
 .diff-line.mod{ background:var(--diff-mod-bg); color:var(--diff-fg-muted); }
+.diff-line[data-resolved]{ background:var(--diff-resolved-bg); color:var(--diff-fg-muted); }
 
 /* unified token class used by overlay and preview */
 .diff-seg{ border-radius:var(--diff-span-radius); font-weight:var(--diff-span-font-weight); color:var(--diff-token-fg); }
 .diff-seg.diff-add{ background:var(--diff-token-add-bg); }
 .diff-seg.diff-del{ background:var(--diff-token-del-bg); }
 .diff-seg.diff-mod{ background:var(--diff-token-mod-bg); }
+.diff-line[data-resolved] .diff-seg.diff-add,
+.diff-line[data-resolved] .diff-seg.diff-del{ background:transparent; }
 
 

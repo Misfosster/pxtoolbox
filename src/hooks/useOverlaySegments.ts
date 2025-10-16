@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import type { Step } from '../utils/diff/line';
 import { mergedSegments, type DiffSeg } from '../utils/diff/inline';
+import { stepKeyForMod, type ModResolution } from '../utils/diff/stepKey';
 
-export type OverlayLineRole = 'none' | 'add' | 'del';
+export type OverlayLineRole = 'none' | 'add' | 'del' | 'resolved';
 
 export interface OverlaySegments {
 	leftOverlayLines: DiffSeg[][];
@@ -17,6 +18,7 @@ interface UseOverlaySegmentsParams {
 	rightLines: string[];
 	ignoreWhitespace: boolean;
 	charLevel: boolean;
+	resolutions?: Record<string, ModResolution>;
 }
 
 const WHITESPACE_TOKEN = /^[\s\u200b\u200c\u200d\ufeff]*$/;
@@ -41,6 +43,7 @@ export function useOverlaySegments({
 	rightLines,
 	ignoreWhitespace,
 	charLevel,
+	resolutions,
 }: UseOverlaySegmentsParams): OverlaySegments {
 	return useMemo(() => {
 		const leftArr: DiffSeg[][] = new Array(leftLines.length);
@@ -98,6 +101,32 @@ export function useOverlaySegments({
 				const rj = st.j ?? -1;
 				const aRaw = li >= 0 ? leftLines[li] ?? '' : '';
 				const bRaw = rj >= 0 ? rightLines[rj] ?? '' : '';
+				const key = stepKeyForMod(st.i, st.j);
+				const resolution = key && resolutions ? resolutions[key] : undefined;
+
+				if (resolution === 'keep-original') {
+					if (li >= 0) {
+						leftArr[li] = [{ text: aRaw, changed: false }];
+						leftRoles[li] = 'resolved';
+					}
+					if (rj >= 0) {
+						rightArr[rj] = [{ text: bRaw, changed: false }];
+						rightRoles[rj] = 'none';
+					}
+					continue;
+				}
+
+				if (resolution === 'keep-altered') {
+					if (li >= 0) {
+						leftArr[li] = [{ text: aRaw, changed: false }];
+						leftRoles[li] = 'none';
+					}
+					if (rj >= 0) {
+						rightArr[rj] = [{ text: bRaw, changed: false }];
+						rightRoles[rj] = 'resolved';
+					}
+					continue;
+				}
 
 				const segs = mergedSegments(aRaw, bRaw, {
 					ignoreWhitespace: false,
@@ -161,5 +190,5 @@ export function useOverlaySegments({
 			leftLineRoles: leftRoles,
 			rightLineRoles: rightRoles,
 		};
-	}, [steps, leftLines, rightLines, ignoreWhitespace, charLevel]);
+	}, [steps, leftLines, rightLines, ignoreWhitespace, charLevel, resolutions]);
 }
