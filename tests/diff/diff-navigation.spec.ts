@@ -74,9 +74,9 @@ test.describe('Diff navigation', () => {
 
     // Keyboard navigation should also work (focus preview container)
     await page.locator('#diff-output').focus();
-    await page.keyboard.press('Alt+ArrowDown');
+    await page.keyboard.press('ArrowDown');
     await page.waitForTimeout(200);
-    await page.keyboard.press('Alt+ArrowUp');
+    await page.keyboard.press('ArrowUp');
     await page.waitForTimeout(200);
 	});
 });

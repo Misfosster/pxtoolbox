@@ -1,27 +1,40 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Button, Card } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
 import CopyButton from '../components/ui/CopyButton';
-import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
-import { normalizeEOL } from '../utils/diff/normalize';
-import { alignLines, splitLinesNoTrailingEmpty } from '../utils/diff/line';
-import { useGutter } from '../hooks/useGutter';
+import { useDiffToolState } from './diff/diffState';
+import { useDiffComputation } from './diff/diffComputation';
 import { useWorkspaceWidth } from '../hooks/useWorkspaceWidth';
-import { useOverlaySegments } from '../hooks/useOverlaySegments';
 import { useDiffNavigation } from '../hooks/useDiffNavigation';
 import DiffSidePane from '../components/diff/DiffSidePane';
 import UnifiedPreview from '../components/diff/UnifiedPreview';
-import { stepKeyForMod, type ModResolution } from '../utils/diff/stepKey';
+import type { ModResolution } from '../utils/diff/stepKey';
 
-const WHITESPACE_ONLY_RE = /^[\s\u200b\u200c\u200d\ufeff]*$/;
 
 const DiffViewerTool: React.FC = () => {
-  const [leftText, setLeftText] = useState<string>('');
-  const [rightText, setRightText] = useState<string>('');
-  const leftRef = useRef<HTMLTextAreaElement | null>(null);
-  const rightRef = useRef<HTMLTextAreaElement | null>(null);
-  const { gutter: leftGutter, metrics: leftMetrics } = useGutter(leftText, leftRef.current);
-  const { gutter: rightGutter, metrics: rightMetrics } = useGutter(rightText, rightRef.current);
+  // Use extracted state management hook
+  const state = useDiffToolState();
+
+  // Use extracted computation hook
+  const computation = useDiffComputation(
+    state.leftText,
+    state.rightText,
+    state.ignoreWs,
+    {}, // resolutions - would need to be passed from state if needed
+    state.leftRef,
+    state.rightRef,
+  );
+
+  // Use extracted navigation hook
+  const { left: leftNav, right: rightNav } = useDiffNavigation({
+    steps: computation.steps,
+    leftLines: computation.leftLines,
+    rightLines: computation.rightLines,
+    leftRef: state.leftRef,
+    rightRef: state.rightRef,
+    leftOverlaySegments: computation.leftOverlayLines,
+    rightOverlaySegments: computation.rightOverlayLines,
+  });
 
   // Fixed gutter width to contain both line numbers and any inline indicators
   const GUTTER_WIDTH_PX = 40; // shared by textareas and preview
@@ -29,41 +42,8 @@ const DiffViewerTool: React.FC = () => {
   const CONTENT_GAP_PX = 8; // space between gutter and text content
   const MIN_ROWS = 16; // revert to shorter vertical size
   const PREVIEW_HEIGHT = 300; // moderate preview height
-
-  // useGutter hook handles metrics and dynamic gutter computation
-
-  const [ignoreWs, setIgnoreWs] = useLocalStorageBoolean('pxtoolbox.diff.ignoreWhitespace', false);
-  const [leftCollapsed, setLeftCollapsed] = useState<boolean>(true);
-  const [rightCollapsed, setRightCollapsed] = useState<boolean>(true);
-  const [persistedOnlyPreview, setPersistedOnlyPreview] = useLocalStorageBoolean('pxtoolbox.diff.persistedOnlyPreview', false);
-  // Reformat baked into ignoreWhitespace now
-  const [activePane, setActivePane] = useState<'left' | 'right'>('left');
-  const [leftScrollTop, setLeftScrollTop] = useState<number>(0);
-  const [rightScrollTop, setRightScrollTop] = useState<number>(0);
-  const [leftHeight, setLeftHeight] = useState<number>(140);
-  const [rightHeight, setRightHeight] = useState<number>(140);
-  const [leftHighlightLine, setLeftHighlightLine] = useState<number | null>(null);
-  const [rightHighlightLine, setRightHighlightLine] = useState<number | null>(null);
-  const leftHighlightTimeoutRef = useRef<number | null>(null);
-  const rightHighlightTimeoutRef = useRef<number | null>(null);
-  // Debounced inputs to avoid thrashing
-  const [debLeft, setDebLeft] = useState<string>('');
-  const [debRight, setDebRight] = useState<string>('');
-  const [debIgnoreWs, setDebIgnoreWs] = useState<boolean>(ignoreWs);
   // removed charInline; preview uses word-level
   const [resolutions, setResolutions] = useState<Record<string, ModResolution>>({});
-  useEffect(() => {
-    const id = setTimeout(() => setDebLeft(leftText), 120);
-    return () => clearTimeout(id);
-  }, [leftText]);
-  useEffect(() => {
-    const id = setTimeout(() => setDebRight(rightText), 120);
-    return () => clearTimeout(id);
-  }, [rightText]);
-  useEffect(() => {
-    const id = setTimeout(() => setDebIgnoreWs(ignoreWs), 120);
-    return () => clearTimeout(id);
-  }, [ignoreWs]);
   // no debounce needed for removed toggle
   const setWorkspaceWidth = useWorkspaceWidth();
   const widthModeRef = useRef<'default' | 'full'>('default');
@@ -73,7 +53,7 @@ const DiffViewerTool: React.FC = () => {
       return;
     }
 
-    const areas = [leftRef.current, rightRef.current].filter(
+    const areas = [state.leftRef.current, state.rightRef.current].filter(
       (el): el is HTMLTextAreaElement => Boolean(el),
     );
 
@@ -132,137 +112,7 @@ const DiffViewerTool: React.FC = () => {
       widthModeRef.current = 'default';
       setWorkspaceWidth('default');
     };
-  }, [setWorkspaceWidth]);
-
-  // Normalize EOLs (debounced for heavy diff)
-  const leftNorm = useMemo(() => normalizeEOL(debLeft), [debLeft]);
-  const rightNorm = useMemo(() => normalizeEOL(debRight), [debRight]);
-  // Normalize EOLs (immediate) previously used for overlay; retained approach removed to keep one source of truth
-
-  // Build alignment (steps + local numbering) used for side-by-side view and preview (debounced)
-  const leftLines = useMemo(() => splitLinesNoTrailingEmpty(leftNorm), [leftNorm]);
-  const rightLines = useMemo(() => splitLinesNoTrailingEmpty(rightNorm), [rightNorm]);
-
-  const alignment = useMemo(
-    () => alignLines(leftNorm, rightNorm, { ignoreWhitespace: debIgnoreWs }),
-    [leftNorm, rightNorm, debIgnoreWs],
-  );
-  const { steps: rawSteps, leftNums: rawLeftNums, rightNums: rawRightNums } = alignment;
-
-  const filteredAlignment = useMemo(() => {
-    if (!debIgnoreWs) {
-      return { steps: rawSteps, leftNums: rawLeftNums, rightNums: rawRightNums };
-    }
-    const fSteps: typeof rawSteps = [];
-    const fLeftNums: number[] = [];
-    const fRightNums: number[] = [];
-
-    rawSteps.forEach((step, idx) => {
-      if (step.type === 'add') {
-        const line = step.j != null ? rightLines[step.j] ?? '' : '';
-        if (WHITESPACE_ONLY_RE.test(line)) {
-          return;
-        }
-      }
-      if (step.type === 'del') {
-        const line = step.i != null ? leftLines[step.i] ?? '' : '';
-        if (WHITESPACE_ONLY_RE.test(line)) {
-          return;
-        }
-      }
-      fSteps.push(step);
-      fLeftNums.push(rawLeftNums[idx]);
-      fRightNums.push(rawRightNums[idx]);
-    });
-
-    return { steps: fSteps, leftNums: fLeftNums, rightNums: fRightNums };
-  }, [debIgnoreWs, rawSteps, rawLeftNums, rawRightNums, rightLines, leftLines]);
-
-  const { steps, leftNums, rightNums } = filteredAlignment;
-
-  const mergedText = useMemo(() => {
-    if (!steps.length) {
-      return leftNorm;
-    }
-    const lines: string[] = [];
-    steps.forEach((step) => {
-      if (step.type === 'same') {
-        if (typeof step.i === 'number') {
-          lines.push(leftLines[step.i] ?? '');
-        }
-        return;
-      }
-      if (step.type === 'add') {
-        if (typeof step.j === 'number') {
-          lines.push(rightLines[step.j] ?? '');
-        }
-        return;
-      }
-      if (step.type === 'del') {
-        return;
-      }
-      if (step.type === 'mod') {
-        const i = typeof step.i === 'number' ? step.i : null;
-        const j = typeof step.j === 'number' ? step.j : null;
-        const key = stepKeyForMod(i, j);
-        const resolution = key ? resolutions[key] : undefined;
-        if (resolution === 'keep-altered') {
-          if (j != null) {
-            lines.push(rightLines[j] ?? '');
-          }
-        } else if (i != null) {
-          lines.push(leftLines[i] ?? '');
-        }
-      }
-    });
-    return lines.join('\n');
-  }, [steps, leftLines, rightLines, leftNorm, rightNorm, resolutions]);
-
-  // Build inline overlay segments and line roles per side mapped to ACTUAL lines per side (no placeholder rows)
-  const { leftOverlayLines, rightOverlayLines } = useOverlaySegments({
-    steps,
-    leftLines,
-    rightLines,
-    ignoreWhitespace: debIgnoreWs,
-    charLevel: false,
-  });
-
-  useEffect(() => {
-    setResolutions((prev) => {
-      if (!steps.length) {
-        return Object.keys(prev).length ? {} : prev;
-      }
-      if (Object.keys(prev).length === 0) {
-        return prev;
-      }
-      const allowed = new Set<string>();
-      for (const st of steps) {
-        if (st.type !== 'mod') continue;
-        if (typeof st.i !== 'number' || typeof st.j !== 'number') continue;
-        allowed.add(`mod:${st.i}:${st.j}`);
-      }
-      if (allowed.size === 0) {
-        return Object.keys(prev).length ? {} : prev;
-      }
-      const next: Record<string, ModResolution> = {};
-      allowed.forEach((key) => {
-        if (prev[key]) {
-          next[key] = prev[key];
-        }
-      });
-      const prevKeys = Object.keys(prev);
-      const nextKeys = Object.keys(next);
-      if (prevKeys.length !== nextKeys.length) {
-        return next;
-      }
-      for (const key of nextKeys) {
-        if (prev[key] !== next[key]) {
-          return next;
-        }
-      }
-      return prev;
-    });
-  }, [steps]);
+  }, [setWorkspaceWidth, state.leftRef, state.rightRef]);
 
   const handleResolutionChange = useCallback((key: string, value: ModResolution | null) => {
     setResolutions((prev) => {
@@ -278,15 +128,6 @@ const DiffViewerTool: React.FC = () => {
     });
   }, []);
 
-  const { left: leftNav, right: rightNav } = useDiffNavigation({
-    steps,
-    leftLines,
-    rightLines,
-    leftRef,
-    rightRef,
-    leftOverlaySegments: leftOverlayLines,
-    rightOverlaySegments: rightOverlayLines,
-  });
   const {
     goNextChange: goNextLeft,
     goPrevChange: goPrevLeft,
@@ -303,49 +144,49 @@ const DiffViewerTool: React.FC = () => {
 
   useEffect(() => {
     if (leftLineIndex != null && leftLineIndex >= 0) {
-      setLeftHighlightLine(leftLineIndex);
-      if (leftHighlightTimeoutRef.current != null) {
-        window.clearTimeout(leftHighlightTimeoutRef.current);
+      state.setLeftHighlightLine(leftLineIndex);
+      if (state.leftHighlightTimeoutRef.current != null) {
+        window.clearTimeout(state.leftHighlightTimeoutRef.current);
       }
-      leftHighlightTimeoutRef.current = window.setTimeout(() => {
-        setLeftHighlightLine(null);
-        leftHighlightTimeoutRef.current = null;
+      state.leftHighlightTimeoutRef.current = window.setTimeout(() => {
+        state.setLeftHighlightLine(null);
+        state.leftHighlightTimeoutRef.current = null;
       }, 700);
     } else {
-      setLeftHighlightLine(null);
+      state.setLeftHighlightLine(null);
     }
-  }, [leftLineIndex]);
+  }, [leftLineIndex, state]);
 
   useEffect(() => {
     if (rightLineIndex != null && rightLineIndex >= 0) {
-      setRightHighlightLine(rightLineIndex);
-      if (rightHighlightTimeoutRef.current != null) {
-        window.clearTimeout(rightHighlightTimeoutRef.current);
+      state.setRightHighlightLine(rightLineIndex);
+      if (state.rightHighlightTimeoutRef.current != null) {
+        window.clearTimeout(state.rightHighlightTimeoutRef.current);
       }
-      rightHighlightTimeoutRef.current = window.setTimeout(() => {
-        setRightHighlightLine(null);
-        rightHighlightTimeoutRef.current = null;
+      state.rightHighlightTimeoutRef.current = window.setTimeout(() => {
+        state.setRightHighlightLine(null);
+        state.rightHighlightTimeoutRef.current = null;
       }, 700);
     } else {
-      setRightHighlightLine(null);
+      state.setRightHighlightLine(null);
     }
-  }, [rightLineIndex]);
+  }, [rightLineIndex, state]);
 
   useEffect(() => {
     return () => {
-      if (leftHighlightTimeoutRef.current != null) {
-        window.clearTimeout(leftHighlightTimeoutRef.current);
+      if (state.leftHighlightTimeoutRef.current != null) {
+        window.clearTimeout(state.leftHighlightTimeoutRef.current);
       }
-      if (rightHighlightTimeoutRef.current != null) {
-        window.clearTimeout(rightHighlightTimeoutRef.current);
+      if (state.rightHighlightTimeoutRef.current != null) {
+        window.clearTimeout(state.rightHighlightTimeoutRef.current);
       }
     };
-  }, []);
+  }, [state]);
 
   const navigate = useCallback(
     (side: 'left' | 'right', direction: 'next' | 'prev', allowFallback = false) => {
       const attempt = (target: 'left' | 'right') => {
-        setActivePane(target);
+        state.setActivePane(target);
         if (target === 'left') {
           return direction === 'next' ? goNextLeft() : goPrevLeft();
         }
@@ -358,7 +199,7 @@ const DiffViewerTool: React.FC = () => {
       if (primaryHasChanges) {
         moved = attempt(side);
       } else {
-        setActivePane(side);
+        state.setActivePane(side);
       }
 
       if (!moved && allowFallback) {
@@ -371,16 +212,16 @@ const DiffViewerTool: React.FC = () => {
 
       return moved;
     },
-    [goNextLeft, goPrevLeft, goNextRight, goPrevRight, leftHasChanges, rightHasChanges],
+    [goNextLeft, goPrevLeft, goNextRight, goPrevRight, leftHasChanges, rightHasChanges, state],
   );
 
   const handleGoNext = useCallback(() => {
-    navigate(activePane, 'next', true);
-  }, [activePane, navigate]);
+    navigate(state.activePane, 'next', true);
+  }, [state.activePane, navigate]);
 
   const handleGoPrev = useCallback(() => {
-    navigate(activePane, 'prev', true);
-  }, [activePane, navigate]);
+    navigate(state.activePane, 'prev', true);
+  }, [state.activePane, navigate]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -415,21 +256,21 @@ const DiffViewerTool: React.FC = () => {
             <DiffSidePane
               id="diff-left"
               label="Original"
-              value={leftText}
-              onChange={setLeftText}
-              onFocus={() => setActivePane('left')}
-              onPasteCollapse={() => setLeftCollapsed(true)}
+              value={state.leftText}
+              onChange={state.setLeftText}
+              onFocus={() => state.setActivePane('left')}
+              onPasteCollapse={() => state.setLeftCollapsed(true)}
               placeholder="Paste original text."
-              textareaRef={leftRef}
-              collapsed={leftCollapsed}
+              textareaRef={state.leftRef}
+              collapsed={state.leftCollapsed}
               minRows={MIN_ROWS}
               collapsedMaxRows={6}
-              height={leftHeight}
-              setHeight={setLeftHeight}
-              scrollTop={leftScrollTop}
-              setScrollTop={setLeftScrollTop}
-              gutter={leftGutter}
-              metrics={leftMetrics}
+              height={state.leftHeight}
+              setHeight={state.setLeftHeight}
+              scrollTop={state.leftScrollTop}
+              setScrollTop={state.setLeftScrollTop}
+              gutter={computation.leftGutter}
+              metrics={computation.leftMetrics}
               overlaySegments={[]}
               overlayRoles={[]}
               overlayId="diff-left-overlay"
@@ -447,7 +288,7 @@ const DiffViewerTool: React.FC = () => {
               nextTooltip={undefined as any}
               changeIndex={0}
               totalChanges={0}
-              highlightLineIndex={leftHighlightLine}
+              highlightLineIndex={state.leftHighlightLine}
               counterTestId="left-change-counter"
             />
           </div>
@@ -455,21 +296,21 @@ const DiffViewerTool: React.FC = () => {
             <DiffSidePane
               id="diff-right"
               label="Altered"
-              value={rightText}
-              onChange={setRightText}
-              onFocus={() => setActivePane('right')}
-              onPasteCollapse={() => setRightCollapsed(true)}
+              value={state.rightText}
+              onChange={state.setRightText}
+              onFocus={() => state.setActivePane('right')}
+              onPasteCollapse={() => state.setRightCollapsed(true)}
               placeholder="Paste altered text."
-              textareaRef={rightRef}
-              collapsed={rightCollapsed}
+              textareaRef={state.rightRef}
+              collapsed={state.rightCollapsed}
               minRows={MIN_ROWS}
               collapsedMaxRows={6}
-              height={rightHeight}
-              setHeight={setRightHeight}
-              scrollTop={rightScrollTop}
-              setScrollTop={setRightScrollTop}
-              gutter={rightGutter}
-              metrics={rightMetrics}
+              height={state.rightHeight}
+              setHeight={state.setRightHeight}
+              scrollTop={state.rightScrollTop}
+              setScrollTop={state.setRightScrollTop}
+              gutter={computation.rightGutter}
+              metrics={computation.rightMetrics}
               overlaySegments={[]}
               overlayRoles={[]}
               overlayId="diff-right-overlay"
@@ -487,7 +328,7 @@ const DiffViewerTool: React.FC = () => {
               nextTooltip={undefined as any}
               changeIndex={0}
               totalChanges={0}
-              highlightLineIndex={rightHighlightLine}
+              highlightLineIndex={state.rightHighlightLine}
               counterTestId="right-change-counter"
             />
           </div>
@@ -497,26 +338,26 @@ const DiffViewerTool: React.FC = () => {
             <UnifiedPreview
                 id="diff-output"
                 height={PREVIEW_HEIGHT}
-                steps={steps}
-                leftText={leftNorm}
-                rightText={rightNorm}
-                leftLines={leftLines}
-                rightLines={rightLines}
-                leftNums={leftNums}
-                rightNums={rightNums}
-                ignoreWhitespace={debIgnoreWs}
+                steps={computation.steps}
+                leftText={computation.leftNorm}
+                rightText={computation.rightNorm}
+                leftLines={computation.leftLines}
+                rightLines={computation.rightLines}
+                leftNums={computation.leftNums}
+                rightNums={computation.rightNums}
+                ignoreWhitespace={state.ignoreWs}
                 charLevel={false}
-                persistedOnly={persistedOnlyPreview}
+                persistedOnly={state.persistedOnlyPreview}
                 resolutions={resolutions}
                 onResolutionChange={handleResolutionChange}
-                onPersistedOnlyChange={setPersistedOnlyPreview}
-                onIgnoreWhitespaceChange={setIgnoreWs}
+                onPersistedOnlyChange={state.setPersistedOnlyPreview}
+                onIgnoreWhitespaceChange={state.setIgnoreWs}
             />
           </div>
         </div>
         <div className="card-bottom" style={{ justifyItems: 'start', display: 'flex', gap: 8 }}>
-          <CopyButton text={mergedText} label="Copy merged" ariaLabel="Copy merged text" disabled={!mergedText} />
-          <Button icon="eraser" onClick={() => { setLeftText(''); setRightText(''); setLeftCollapsed(false); setRightCollapsed(false); }} disabled={!leftText && !rightText}>Clear</Button>
+          <CopyButton text={computation.mergedText} label="Copy merged" ariaLabel="Copy merged text" disabled={!computation.mergedText} />
+          <Button icon="eraser" onClick={() => { state.setLeftText(''); state.setRightText(''); state.setLeftCollapsed(false); state.setRightCollapsed(false); }} disabled={!state.leftText && !state.rightText}>Clear</Button>
         </div>
       </Card>
     </ToolShell>

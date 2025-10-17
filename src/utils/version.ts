@@ -25,7 +25,7 @@ const getReleaseDate = (): string => {
 };
 
 export const getAppVersion = (): string => {
-  return getVersionFromEnv() || '0.1.0';
+  return getVersionFromEnv() || '1.0.0';
 };
 
 export const getAppReleaseDate = (): string => {

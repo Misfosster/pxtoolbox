@@ -45,4 +45,10 @@
   min-width:0;
 }
 
+/* Focus styling for diff container to enable keyboard navigation */
+#diff-output:focus {
+  border-color: rgba(161,132,255,0.55) !important;
+  box-shadow: 0 0 0 1px rgba(161,132,255,0.28);
+}
+
 

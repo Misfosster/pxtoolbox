@@ -4,19 +4,59 @@ A developer utilities platform built for incremental development during William'
 
 ## Current Status
 
-**Core app ready.** Multiple tools implemented and tested.
+**Production-ready developer toolkit.** All core tools implemented with advanced features and comprehensive testing.
 
-### Implemented
-- **Base64 Encoder/Decoder**: Encode/decode with Base64URL support, auto-padding, whitespace tolerance, copy buttons, and clear error states. Route: `/#/tools/base64`.
-- **JWT Decoder**: Paste a JWT to view decoded header and payload (pretty‑printed). Shows helper hints for `nbf`, `iat`, `exp` with UTC and relative times; toggle hints visibility; copy buttons per section. Route: `/#/tools/jwt`.
-- **URL Encoder/Decoder**: Convert text to and from URL encoding using `encodeURIComponent`/`decodeURIComponent`. Treats `+` as space on decode. Copy buttons and clear action included. Route: `/#/tools/url`.
-- **JSON Formatter**: Validate, pretty‑print, and minify JSON. Editable formatted view and a foldable tree with inline key/value editing; autosize inputs; copy actions. Route: `/#/tools/json`.
-- **Diff Viewer (MVP)**: Side‑by‑side text inputs with a simple unified diff preview. Route: `/#/tools/diff`.
+### Implemented Tools
 
-### Planned Features
-- **Hash Generators**: MD5, SHA1, SHA256
-- **Case Converters**: camelCase, snake_case, kebab-case
-- **API Testing Tools**: Quick HTTP requests and response formatting
+#### **🔧 Base64 Encoder/Decoder** (`/#/tools/base64`)
+- **Dual-pane interface**: Text ↔ Base64 with live conversion
+- **Base64URL support**: Handles URL-safe Base64 encoding
+- **Smart padding**: Auto-adds missing padding characters
+- **Whitespace tolerance**: Ignores whitespace in input
+- **File operations**: Encode/decode files with drag & drop support
+- **Copy buttons**: Individual copy actions for each pane
+- **Format detection**: Auto-detects common file types (PNG, JPEG, PDF, text)
+
+#### **🔐 JWT Decoder** (`/#/tools/jwt`)
+- **Token parsing**: Decodes header and payload with signature display
+- **Time helpers**: Shows `nbf`, `iat`, `exp` with UTC and relative times
+- **Toggleable hints**: Show/hide helper information
+- **Copy functionality**: Copy header, payload, or full token
+- **Validation**: Visual feedback for malformed tokens
+- **Responsive layout**: Works on all screen sizes
+
+#### **🌐 URL Encoder/Decoder** (`/#/tools/url`)
+- **Bidirectional conversion**: Text ↔ URL encoding
+- **Standards compliant**: Uses `encodeURIComponent`/`decodeURIComponent`
+- **Space handling**: Properly handles `+` as space in decoding
+- **Copy buttons**: Quick copy actions for both directions
+- **Clear interface**: Simple, focused tool design
+
+#### **📋 JSON Formatter** (`/#/tools/json`)
+- **Real-time validation**: Validates as you type with error indicators
+- **Dual-pane editing**: Formatted text (left) ↔ foldable tree (right)
+- **Inline editing**: Click any value in tree to edit directly
+- **Smart formatting**: Auto-formats on valid paste/type
+- **Copy options**: Copy formatted, minified, or tree data
+- **Collapsible tree**: Fold/unfold nested objects and arrays
+- **Responsive design**: Adapts to different screen sizes
+
+#### **⚖️ Diff Viewer** (`/#/tools/diff`)
+- **Side-by-side comparison**: Two text inputs with synchronized scrolling
+- **Unified preview**: Clean diff view with additions (green), deletions (red), modifications (blue)
+- **Advanced navigation**: Arrow keys navigate between modifications only
+- **Smart positioning**: Focused modifications center in viewport for optimal visibility
+- **Container awareness**: Works correctly in multiple-pane layouts
+- **Whitespace handling**: Toggle to ignore whitespace differences
+- **Persisted-only mode**: Show only resolved changes and persistent content
+- **Responsive gutters**: Line numbers and markers align properly
+
+### Future Enhancements
+- **Hash Generators**: MD5, SHA1, SHA256, SHA3
+- **Case Converters**: camelCase, snake_case, kebab-case, PascalCase
+- **API Testing Tools**: HTTP client with request builder and response formatting
+- **Regex Tester**: Interactive regular expression testing and validation
+- **Color Tools**: Color picker, converter (HEX, RGB, HSL), and palette generator
 
 ### Project Features
 - **Dark Theme**: Professional, modern interface
@@ -24,13 +64,23 @@ A developer utilities platform built for incremental development during William'
 - **Responsive Design**: Works on desktop and mobile
 - **Incremental Development**: Add tools one at a time
 
+## Architecture
+
+- **Component-based design**: Each tool is a self-contained React component
+- **Shared UI primitives**: Common components in `src/components/ui/` for consistency
+- **Utility-first logic**: Business logic separated into `src/utils/` modules
+- **TypeScript throughout**: Full type safety from components to utilities
+- **Test-driven development**: Comprehensive E2E tests for all user interactions
+
 ## Tech Stack
 
-- **React 18** with TypeScript
-- **Blueprint JS** for UI components
-- **Vite** for fast development and building
-- **React Router** (HashRouter) for GitHub Pages-friendly routing
-- **GitHub Actions** for CI/CD
+- **React 18** with TypeScript for type-safe component development
+- **Blueprint.js** for consistent, accessible UI components
+- **Vite** for fast development server and optimized production builds
+- **React Router** with smart routing (BrowserRouter for production/GitHub Pages, HashRouter only for test environment)
+- **Playwright** for comprehensive end-to-end testing
+- **ESLint + Prettier** for code quality and formatting
+- **GitHub Actions** for automated CI/CD with testing and deployment
 
 ## Getting Started
 
@@ -86,14 +136,14 @@ Details:
 
 Troubleshooting:
 - If the port is in use, stop existing preview servers or change the port in `playwright.config.ts`.
-- If tests fail to find routes, ensure the app is using hash routing and navigate via `/#/...` paths in tests.
+- If tests fail to find routes, ensure tests use hash routing (`/#/tools/...`) while production uses clean URLs (`/tools/...`).
 
 ## Deployment
 
 ### GitHub Pages (Project Site)
 This repo is configured to deploy to GitHub Pages using GitHub Actions. It supports both user/org and project sites.
 
-- Router uses `HashRouter` so page refreshes work on Pages
+- Router uses `BrowserRouter` for clean URLs on GitHub Pages (test environment uses `HashRouter`)
 - Vite `base` is set dynamically using the repo name in CI
 
 Steps:
@@ -108,31 +158,37 @@ If forking or renaming:
 ### Internal Hosting
 The `dist/` output can be served by any static file server. No backend required.
 
-## Available Tools
+## Tool Features
 
-- **Base64 Encoder/Decoder** (`/#/tools/base64`)
-  - Enter text (left) to see Base64 (right), or paste Base64 (right) to decode text (left)
-  - Tolerant of Base64URL, missing padding, and whitespace
-  - Copy buttons and clear action
+### **🔧 Base64 Encoder/Decoder**
+- **Live conversion**: Text ↔ Base64 with real-time updates
+- **File support**: Drag & drop files for encoding/decoding
+- **Smart detection**: Auto-detects file types and formats
+- **Error handling**: Graceful handling of malformed input
 
-- **JWT Decoder** (`/#/tools/jwt`)
-  - Paste a token to decode header and payload; signature shown raw
-  - Helper hints for `nbf`, `iat`, `exp` with UTC and relative times (toggleable)
-  - Copy buttons for header and payload
+### **🔐 JWT Decoder**
+- **Complete token analysis**: Header, payload, and signature sections
+- **Time visualization**: UTC and relative time displays for timestamps
+- **Interactive hints**: Toggleable helper information
+- **Copy options**: Individual copy buttons for each section
 
-- **URL Encoder/Decoder** (`/#/tools/url`)
-  - Encode text to URL‑encoded form or decode URL‑encoded input back to text
-  - Uses `encodeURIComponent`/`decodeURIComponent`; treats `+` as space on decode
-  - Copy buttons and clear action
+### **🌐 URL Encoder/Decoder**
+- **Standards compliant**: Proper URL encoding/decoding
+- **Space handling**: Correctly handles `+` as space in decoding
+- **Quick actions**: Copy buttons for both input and output
 
-- **JSON Formatter** (`/#/tools/json`)
-  - Validates as you type; auto‑formats on paste/type when valid
-  - Editable formatted text on the left; foldable tree with inline editing on the right
-  - Buttons to Format/Minify, copy actions, and autosizing inputs
+### **📋 JSON Formatter**
+- **Dual editing modes**: Text editor and visual tree editor
+- **Inline editing**: Click any tree value to edit directly
+- **Validation**: Real-time error detection and feedback
+- **Multiple formats**: Pretty-print, minify, and tree view options
 
-- **Diff Viewer (MVP)** (`/#/tools/diff`)
-  - Two text panes; shows a simple unified diff preview below
-  - Intended to evolve with a richer JSON tree + text diff view
+### **⚖️ Diff Viewer**
+- **Visual diff display**: Color-coded additions (green), deletions (red), modifications (blue)
+- **Keyboard navigation**: Arrow keys navigate between modifications
+- **Smart scrolling**: Focused modifications center in viewport
+- **Multiple modes**: Toggle whitespace ignore and persisted-only view
+- **Responsive design**: Works on all screen sizes
 
 ## License
 
