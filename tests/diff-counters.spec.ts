@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Diff Viewer – counters and changed-only preview', () => {
+test.describe('Diff Viewer – counters and persisted-only preview', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/#/tools/diff');
     await page.waitForSelector('#diff-left');
@@ -19,7 +19,7 @@ test.describe('Diff Viewer – counters and changed-only preview', () => {
     await expect(counters.getByTestId('count-mod')).toHaveText('~1');
   });
 
-  test('changed-only preview hides unchanged lines', async ({ page }) => {
+  test('persisted-only preview hides transient lines', async ({ page }) => {
     const left = ['keep1', 'changeMe', 'keep2'].join('\n');
     const right = ['keep1', 'changeMe!', 'keep2'].join('\n');
     await page.locator('#diff-left').fill(left);
@@ -28,12 +28,15 @@ test.describe('Diff Viewer – counters and changed-only preview', () => {
     // Unchanged lines present by default
     await expect(page.locator('#diff-output [data-preview-line][data-marker=" "]')).toHaveCount(2);
 
-    // Enable changed-only (click Blueprint indicator to avoid input overlay issues)
-    await page.locator('.bp6-switch:has(input[aria-label="Changed-only preview"]) .bp6-control-indicator').click();
+    // Enable persisted-only (click Blueprint indicator to avoid input overlay issues)
+    await page.locator('.bp6-switch:has(input[aria-label="Persisted-only preview"]) .bp6-control-indicator').click();
 
-    await expect(page.locator('#diff-output [data-preview-line][data-marker=" "]')).toHaveCount(0);
+    // Persisted-only should still show unchanged and resolved lines, but hide pure deletes
+    await expect(page.locator('#diff-output [data-preview-line][data-marker=" "]')).toHaveCount(2);
+    await expect(page.locator('#diff-output [data-preview-line][data-marker="+"]')).toHaveCount(0);
     // Still shows the modified line
     await expect(page.locator('#diff-output [data-preview-line][data-marker="?"]')).toHaveCount(1);
+    await expect(page.locator('#diff-output [data-preview-line][data-marker="-"]')).toHaveCount(0);
   });
 });
 

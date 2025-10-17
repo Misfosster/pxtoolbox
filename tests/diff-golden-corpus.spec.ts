@@ -83,7 +83,7 @@ test.describe('Golden Corpus - Visual Validation', () => {
     await page.waitForTimeout(100);
     
     // Enable changed-only view (if toggle exists)
-    const changedOnlyToggle = page.getByTestId('diff-changed-only-toggle');
+    const changedOnlyToggle = page.getByTestId('toggle-persisted-only-preview');
     if (await changedOnlyToggle.isVisible()) {
       await changedOnlyToggle.click();
       await page.waitForTimeout(100);

@@ -17,10 +17,10 @@ export interface UnifiedPreviewProps {
 	rightNums: number[];
 	ignoreWhitespace: boolean;
 	charLevel: boolean;
-	changedOnly: boolean;
+	persistedOnly: boolean;
 	resolutions?: Record<string, ModResolution>;
 	onResolutionChange?: (key: string, value: ModResolution | null) => void;
-	onChangedOnlyChange: (value: boolean) => void;
+	onPersistedOnlyChange: (value: boolean) => void;
 	onIgnoreWhitespaceChange?: (value: boolean) => void;
 }
 
@@ -159,13 +159,13 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 	rightLines,
 	leftNums,
 	rightNums,
-    ignoreWhitespace,
+	ignoreWhitespace,
 	charLevel,
-	changedOnly,
+	persistedOnly,
 	resolutions,
 	onResolutionChange,
-	onChangedOnlyChange,
-    onIgnoreWhitespaceChange,
+	onPersistedOnlyChange,
+	onIgnoreWhitespaceChange,
 }) => {
     const containerRef = useRef<HTMLDivElement | null>(null);
     const [focusedStepIndex, setFocusedStepIndex] = useState<number | null>(null);
@@ -229,21 +229,22 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
         const rowNodes: React.ReactNode[] = [];
 
         const renderLine = (
-			key: string,
-			displayNum: number,
-			marker: '+' | '-' | ' ' | '~',
-			content: React.ReactNode,
-			segments?: LocalSeg[],
+            key: string,
+            displayNum: number,
+            marker: '+' | '-' | ' ' | '~',
+            content: React.ReactNode,
+            segments?: LocalSeg[],
             onClick?: () => void,
             isFocused?: boolean,
             isPersisted?: boolean,
-		) => {
+            isResolved?: boolean,
+        ) => {
 			const isAdd = marker === '+';
 			const isDel = marker === '-';
 			const isMod = marker === '~';
 			const cls = isAdd ? 'diff-line add' : isDel ? 'diff-line del' : isMod ? 'diff-line mod' : 'diff-line';
             const bg = isPersisted
-                ? 'rgba(116,86,190,0.22)'
+                ? 'var(--diff-resolved-bg, rgba(75,139,190,0.22))'
                 : isAdd
 				? 'var(--diff-add-bg)'
 				: isDel
@@ -251,13 +252,14 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 				: isMod
 				? 'var(--diff-mod-bg)'
 				: 'transparent';
-			const displayLabel = displayNum === 0 ? '' : displayNum;
-            const markerLabel = isPersisted ? '~' : (marker !== ' ' ? marker : '');
+            const displayLabel = displayNum === 0 ? '' : displayNum;
+            const markerLabel = isResolved ? '~' : (marker !== ' ' ? marker : '');
 
 			return (
 				<div
 					key={key}
-					data-preview-line
+                    data-preview-line
+                    data-resolved={isResolved ? 'true' : undefined}
 					data-marker={marker}
 					data-display-index={displayNum}
                     data-step-index={key}
@@ -280,8 +282,8 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 						color: MUTED_COLOR,
 						background: bg,
                         // subtle focus ring for keyboard/arrow navigation
-                        border: isFocused && !isPersisted ? '1px solid rgba(161,132,255,0.35)' : (isPersisted ? '1px solid rgba(161,132,255,0.55)' : undefined),
-                        boxShadow: isFocused && !isPersisted ? '0 0 0 1px rgba(161,132,255,0.18)' : (isPersisted ? '0 0 0 1px rgba(161,132,255,0.28)' : undefined),
+                        border: isFocused && !isResolved ? '1px solid rgba(161,132,255,0.35)' : (isResolved ? '1px solid rgba(161,132,255,0.55)' : undefined),
+                        boxShadow: isFocused && !isResolved ? '0 0 0 1px rgba(161,132,255,0.18)' : (isResolved ? '0 0 0 1px rgba(161,132,255,0.28)' : undefined),
 						cursor: onClick ? 'pointer' : 'default',
 						outline: 'none',
 					}}
@@ -331,7 +333,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
             onKeepRight?: () => void,
             isFocused?: boolean,
 		) => {
-			const classifyChange = (segments: LocalSeg[]): 'add' | 'del' | 'none' => {
+            const classifyChange = (segments: LocalSeg[]): 'add' | 'del' | 'both' | 'none' => {
 				let hasAdd = false;
 				let hasDel = false;
 				for (const seg of segments) {
@@ -339,9 +341,9 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 					if (seg.diffType === 'add') hasAdd = true;
 					if (seg.diffType === 'del') hasDel = true;
 				}
-				if (hasAdd && !hasDel) return 'add';
-				if (hasDel && !hasAdd) return 'del';
-				if (hasAdd && hasDel) return 'add';
+                if (hasAdd && !hasDel) return 'add';
+                if (hasDel && !hasAdd) return 'del';
+                if (hasAdd && hasDel) return 'both';
 				return 'none';
 			};
 
@@ -351,18 +353,18 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 				onSelect?: () => void,
 			) => {
 				const change = classifyChange(segments);
-				const changeBorder =
-					change === 'add'
-						? 'rgba(46,160,67,0.4)'
-						: change === 'del'
-						? 'rgba(248,81,73,0.42)'
-						: 'rgba(100,148,237,0.3)';
-				const changeBackground =
-					change === 'add'
-						? 'rgba(46,160,67,0.12)'
-						: change === 'del'
-						? 'rgba(248,81,73,0.12)'
-						: 'rgba(16,22,26,0.38)';
+                const changeBorder =
+                    change === 'add'
+                        ? 'rgba(46,160,67,0.4)'
+                        : change === 'del'
+                        ? 'rgba(248,81,73,0.42)'
+                        : 'rgba(100,148,237,0.3)';
+                const changeBackground =
+                    change === 'add'
+                        ? 'rgba(46,160,67,0.12)'
+                        : change === 'del'
+                        ? 'rgba(248,81,73,0.12)'
+                        : 'var(--diff-mod-bg)';
 				const selectedBorder = 'rgba(161,132,255,0.55)';
 				const selectedGlow = 'rgba(161,132,255,0.28)';
 				const selectedBackground = 'rgba(116,86,190,0.22)';
@@ -480,9 +482,15 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 
         for (let idx = 0; idx < displaySteps.length; idx++) {
             const step = displaySteps[idx];
-			if (changedOnly && step.type === 'same') continue;
+            const next = displaySteps[idx + 1];
+            const isMergedPair = step.type === 'del' && next && next.type === 'add';
 
-			if (step.type === 'same') {
+            // Persisted-only should include: unchanged, adds, and ALL mods (resolved or unresolved),
+            // plus preview-merged del+add pairs. Only pure deletions are hidden.
+            const isPersistedCandidate = step.type === 'same' || step.type === 'add' || step.type === 'mod' || isMergedPair;
+            if (persistedOnly && !isPersistedCandidate) continue;
+
+            if (step.type === 'same') {
 				const rawNum = displayLeftNums[idx];
 				const displayNum = rawNum === undefined ? (step.i ?? 0) + 1 : rawNum;
 				const contentRaw = step.i != null ? leftLines[step.i] ?? '' : '';
@@ -493,7 +501,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 				}
 				lastRenderedWhitespace = isWhitespaceRow;
                 const isFocused = focusedStepIndex === idx;
-                rowNodes.push(renderLine(`same-${idx}`, displayNum, ' ', content, undefined, undefined, isFocused, false));
+                rowNodes.push(renderLine(`same-${idx}`, displayNum, ' ', content, undefined, undefined, isFocused, false, false));
 				continue;
 			}
 
@@ -505,8 +513,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
                     const displayNum = rawNum === undefined ? (step.i ?? 0) + 1 : rawNum;
                     const aRaw = step.i != null ? leftLines[step.i] ?? '' : '';
                     const bRaw = next.j != null ? rightLines[next.j] ?? '' : '';
-                    const leftFormatted = formatTextForPreview(aRaw, ignoreWhitespace);
-                    const rightFormatted = formatTextForPreview(bRaw, ignoreWhitespace);
+                    // Precompute formatted variants if needed later
 
                     // Delegate whitespace handling to mergedSegments/compareKey; use originals
                     const leftDiffSource = aRaw;
@@ -524,18 +531,29 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
                         const resolution = key && resolutions ? resolutions[key] : undefined;
                         const isFocused = focusedStepIndex === idx;
                         if (resolution && key) {
-                            const chosen = resolution === 'keep-original' ? leftFormatted.display : rightFormatted.display;
                             const revert = onResolutionChange ? () => onResolutionChange(key, null) : undefined;
+                            // For keep-original, mark changed tokens as additions (green) in the resolved row
+                        const selectedSegments: LocalSeg[] =
+                                resolution === 'keep-original'
+                                    ? segs
+                                        .filter((seg) => !seg.changed || seg.diffType === 'del')
+                                        .map((seg) => ({ ...seg, diffType: seg.changed ? 'del' : undefined } as LocalSeg))
+                                    : segs
+                                        .filter((seg) => !seg.changed || seg.diffType === 'add')
+                                        .map((seg) => ({ ...seg, diffType: seg.changed ? 'add' : undefined } as LocalSeg));
                             rowNodes.push(
-                                renderLine(`mod-${idx}-${resolution}`, displayNum, ' ', chosen, undefined, revert, isFocused, Boolean(resolution)),
+                                renderLine(`mod-${idx}-${resolution}`, displayNum, ' ', '', selectedSegments, revert, isFocused, true, true),
                             );
                         } else {
-                            const leftSegments: LocalSeg[] = segs
-                                .filter((seg) => !seg.changed || seg.diffType === 'del')
-                                .map((seg) => ({ ...seg, diffType: seg.diffType === 'del' ? 'del' : undefined } as LocalSeg));
-                            const rightSegments: LocalSeg[] = segs
-                                .filter((seg) => !seg.changed || seg.diffType === 'add')
-                                .map((seg) => ({ ...seg, diffType: seg.diffType === 'add' ? 'add' : undefined } as LocalSeg));
+                            // Unresolved preview: show both sides' perspective inside each option
+                            // Left option (keep-original): tokens kept (left-only) should appear green, tokens missing (right-only) red
+                            const leftSegments: LocalSeg[] = segs.map((seg) => {
+                                if (!seg.changed) return seg as LocalSeg;
+                                const flipped = seg.diffType === 'add' ? 'del' : 'add';
+                                return { ...seg, diffType: flipped } as LocalSeg;
+                            });
+                            // Right option (keep-altered): use natural mapping (right-only green, left-only red)
+                            const rightSegments: LocalSeg[] = segs.map((seg) => seg as LocalSeg);
                             rowNodes.push(
                                 renderChoiceLine(
                                     `mod-merged-${idx}`,
@@ -563,7 +581,9 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 				}
 				lastRenderedWhitespace = isWhitespaceRow;
                 const isFocused = focusedStepIndex === idx;
-                rowNodes.push(renderLine(`del-${idx}`, displayNum, '-', content, undefined, undefined, isFocused, false));
+                if (!persistedOnly) {
+                    rowNodes.push(renderLine(`del-${idx}`, displayNum, '-', content, undefined, undefined, isFocused, false, false));
+                }
 				continue;
 			}
 
@@ -578,7 +598,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 				}
 				lastRenderedWhitespace = isWhitespaceRow;
                 const isFocused = focusedStepIndex === idx;
-                rowNodes.push(renderLine(`add-${idx}`, displayNum, '+', content, undefined, undefined, isFocused, false));
+                rowNodes.push(renderLine(`add-${idx}`, displayNum, '+', content, undefined, undefined, isFocused, false, false));
 				continue;
 			}
 
@@ -609,38 +629,41 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 				const key = stepKeyForMod(step.i, step.j);
 				const resolution = key && resolutions ? resolutions[key] : undefined;
 
-                let leftSegments: LocalSeg[] = segs
-					.filter((seg) => !seg.changed || seg.diffType === 'del')
-					.map((seg) => {
-						const diffType = seg.diffType === 'del' ? 'del' : undefined;
-						return { ...seg, diffType } as LocalSeg;
-					});
+                let leftSegments: LocalSeg[] = segs.map((seg) => {
+                    if (!seg.changed) return seg as LocalSeg;
+                    // Left perspective: right-only tokens should appear red (del), left-only green (add)
+                    const flipped = seg.diffType === 'add' ? 'del' : 'add';
+                    return { ...seg, diffType: flipped } as LocalSeg;
+                });
                 if (leftSegments.length === 0) {
                     leftSegments = [{ text: leftFormatted.display as unknown as string, changed: false } as LocalSeg];
                 }
-                let rightSegments: LocalSeg[] = segs
-					.filter((seg) => !seg.changed || seg.diffType === 'add')
-					.map((seg) => {
-						const diffType = seg.diffType === 'add' ? 'add' : undefined;
-						return { ...seg, diffType } as LocalSeg;
-					});
+                let rightSegments: LocalSeg[] = segs.map((seg) => seg as LocalSeg);
                 if (rightSegments.length === 0) {
                     rightSegments = [{ text: rightFormatted.display as unknown as string, changed: false } as LocalSeg];
                 }
 
                 if (resolution && key) {
-					const chosen =
-						resolution === 'keep-original' ? leftFormatted.display : rightFormatted.display;
-					const revert =
-						onResolutionChange ? () => onResolutionChange(key, null) : undefined;
-                    // Persist highlight for resolved changes even when not focused
+                    const revert = onResolutionChange ? () => onResolutionChange(key, null) : undefined;
                     const isFocused = focusedStepIndex === idx;
-                    const isPersisted = Boolean(resolution);
+                    // Recompute segments for display with whitespace preserved (do not collapse spaces)
+                    const segsDisplay = mergedSegments(aRaw, bRaw, {
+                        ignoreWhitespace: false,
+                        mode: charLevel ? 'char' : 'word',
+                    }) as LocalSeg[];
+                    // In resolved view, only highlight KEPT tokens in green, do not show removed tokens
+                    const leftDisplay: LocalSeg[] = segsDisplay
+                        .filter((seg) => !seg.changed || seg.diffType === 'del')
+                        .map((seg) => (seg.changed ? ({ ...seg, diffType: 'add' } as LocalSeg) : (seg as LocalSeg)));
+                    const rightDisplay: LocalSeg[] = segsDisplay
+                        .filter((seg) => !seg.changed || seg.diffType === 'add')
+                        .map((seg) => seg as LocalSeg);
+                    const selectedSegments = resolution === 'keep-original' ? leftDisplay : rightDisplay;
                     rowNodes.push(
-                        renderLine(`mod-${idx}-${resolution}`, displayNum, ' ', chosen, undefined, revert, isFocused, isPersisted),
+                        renderLine(`mod-${idx}-${resolution}`, displayNum, ' ', '', selectedSegments, revert, isFocused, true, true),
                     );
-					continue;
-				}
+                    continue;
+                }
 
 				const selectOriginal =
 					key && onResolutionChange
@@ -667,7 +690,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
 		}
 
 		return rowNodes;
-    }, [steps, changedOnly, leftNums, rightNums, leftLines, rightLines, ignoreWhitespace, charLevel, resolutions, onResolutionChange, focusedStepIndex]);
+    }, [steps, persistedOnly, leftNums, rightNums, leftLines, rightLines, ignoreWhitespace, charLevel, resolutions, onResolutionChange, focusedStepIndex]);
 
     const changeStepIndices = useMemo(() => {
         const indices: number[] = [];
@@ -753,15 +776,15 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
                 </span>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
                     <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>
-                        Changed-only preview
+                        Persisted-only preview
                     </span>
                     <Switch
-                        checked={changedOnly}
-                        onChange={(event) => onChangedOnlyChange((event.currentTarget as HTMLInputElement).checked)}
-                        aria-label="Changed-only preview"
+                        checked={persistedOnly}
+                        onChange={(event) => onPersistedOnlyChange((event.currentTarget as HTMLInputElement).checked)}
+                        aria-label="Persisted-only preview"
                         label={undefined}
                         style={{ margin: 0 }}
-                        data-testid="toggle-changed-only-preview"
+                        data-testid="toggle-persisted-only-preview"
                     />
                 </span>
 			</div>

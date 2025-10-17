@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Button, Card, Switch } from '@blueprintjs/core';
+import { Button, Card } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
 import CopyButton from '../components/ui/CopyButton';
 import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
@@ -35,7 +35,7 @@ const DiffViewerTool: React.FC = () => {
   const [ignoreWs, setIgnoreWs] = useLocalStorageBoolean('pxtoolbox.diff.ignoreWhitespace', false);
   const [leftCollapsed, setLeftCollapsed] = useState<boolean>(true);
   const [rightCollapsed, setRightCollapsed] = useState<boolean>(true);
-  const [changedOnlyPreview, setChangedOnlyPreview] = useLocalStorageBoolean('pxtoolbox.diff.changedOnlyPreview', false);
+  const [persistedOnlyPreview, setPersistedOnlyPreview] = useLocalStorageBoolean('pxtoolbox.diff.persistedOnlyPreview', false);
   // Reformat baked into ignoreWhitespace now
   const [activePane, setActivePane] = useState<'left' | 'right'>('left');
   const [leftScrollTop, setLeftScrollTop] = useState<number>(0);
@@ -410,13 +410,6 @@ const DiffViewerTool: React.FC = () => {
       toolId="diff"
     >
       <Card elevation={1}>
-        <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span style={{ color: 'rgba(191, 204, 214, 0.85)', userSelect: 'none', lineHeight: '20px' }}>Ignore whitespace</span>
-            <Switch checked={ignoreWs} onChange={(e) => setIgnoreWs((e.currentTarget as HTMLInputElement).checked)} aria-label="Ignore whitespace" label={undefined} style={{ margin: 0 }} />
-          </div>
-          
-        </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, alignItems: 'stretch' }}>
           <div style={{ flex: '1 1 600px', minWidth: 480 }}>
             <DiffSidePane
@@ -513,10 +506,10 @@ const DiffViewerTool: React.FC = () => {
                 rightNums={rightNums}
                 ignoreWhitespace={debIgnoreWs}
                 charLevel={false}
-                changedOnly={changedOnlyPreview}
+                persistedOnly={persistedOnlyPreview}
                 resolutions={resolutions}
                 onResolutionChange={handleResolutionChange}
-                onChangedOnlyChange={setChangedOnlyPreview}
+                onPersistedOnlyChange={setPersistedOnlyPreview}
                 onIgnoreWhitespaceChange={setIgnoreWs}
             />
           </div>

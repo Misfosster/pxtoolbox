@@ -116,13 +116,7 @@ export function useOverlaySegments({
                         leftSegs.push({ text: aRaw, changed: false });
 					}
 					leftArr[li] = leftSegs;
-					if (process.env.NODE_ENV !== 'production') {
-						const leftOverlayText = leftArr[li].map((s) => s.text).join('');
-						if (leftOverlayText !== aRaw) {
-							// eslint-disable-next-line no-console
-							console.warn(`Left overlay mismatch at line ${li + 1}:`, { expected: aRaw, got: leftOverlayText });
-						}
-					}
+                    // Debug overlay mismatch checks removed to avoid console noise
 				}
 
 				if (rj >= 0) {
@@ -133,13 +127,7 @@ export function useOverlaySegments({
                         rightSegs.push({ text: bRaw, changed: false });
 					}
 					rightArr[rj] = rightSegs;
-					if (process.env.NODE_ENV !== 'production') {
-						const rightOverlayText = rightArr[rj].map((s) => s.text).join('');
-						if (rightOverlayText !== bRaw) {
-							// eslint-disable-next-line no-console
-							console.warn(`Right overlay mismatch at line ${rj + 1}:`, { expected: bRaw, got: rightOverlayText });
-						}
-					}
+                    // Debug overlay mismatch checks removed to avoid console noise
 				}
 			}
 		}
