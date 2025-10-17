@@ -11,6 +11,15 @@ import { test, expect } from '@playwright/test';
   test.beforeEach(async ({ page }) => {
     await page.goto('/#/tools/diff');
     await page.waitForSelector('#diff-left');
+    // Ensure toggles are in default state
+    const persistedInput = page.locator('input[aria-label="Persisted-only preview"]');
+    if (await persistedInput.isChecked()) {
+      await page.locator('.bp6-switch:has(input[aria-label="Persisted-only preview"]) .bp6-control-indicator').click();
+    }
+    const ignoreInput = page.locator('input[aria-label="Ignore whitespace"]');
+    if (await ignoreInput.isChecked()) {
+      await page.locator('.bp6-switch:has(input[aria-label="Ignore whitespace"]) .bp6-control-indicator').click();
+    }
   });
 
   test('unresolved vs resolved colors', async ({ page }) => {
@@ -23,14 +32,15 @@ import { test, expect } from '@playwright/test';
 
     // Ensure preview shows one mod row, with both add and del tokens present
     const preview = page.locator('#diff-output');
-    await expect(preview.locator('[data-preview-line][data-marker="?"]')).toHaveCount(1);
+    await expect(preview.locator('[data-preview-line][data-marker="?"]')).toBeVisible();
 
     // In unresolved state: should have at least one .diff-del (red) and one .diff-add (green)
-    await expect(preview.locator('.diff-seg.diff-del')).toHaveCountGreaterThan(0);
-    await expect(preview.locator('.diff-seg.diff-add')).toHaveCountGreaterThan(0);
+    expect(await preview.locator('.diff-seg.diff-del').count()).toBeGreaterThan(0);
+    expect(await preview.locator('.diff-seg.diff-add').count()).toBeGreaterThan(0);
 
     // Resolve to keep-original (left side), via option button on the mod row
     const modRow = preview.locator('[data-preview-line][data-marker="?"]').first();
+    await expect(modRow.locator('button')).toHaveCount(2);
     // Click the left option button
     await modRow.locator('button').first().click();
 
@@ -39,18 +49,18 @@ import { test, expect } from '@playwright/test';
     await expect(persistedRow).toBeVisible();
 
     // In resolved keep-original, changed tokens should show as additions (green) in the persisted row
-    await expect(persistedRow.locator('.diff-seg.diff-add')).toHaveCountGreaterThan(0);
+    expect(await persistedRow.locator('.diff-seg.diff-add').count()).toBeGreaterThan(0);
     await expect(persistedRow.locator('.diff-seg.diff-del')).toHaveCount(0);
 
-    // Now resolve to keep-altered: click right option on a fresh diff
-    await page.locator('#diff-left').fill(left);
-    await page.locator('#diff-right').fill(right);
-    const modRow2 = preview.locator('[data-preview-line][data-marker="?"]').first();
+    // Revert resolution by clicking the persisted row, then choose keep-altered on the same row
+    await persistedRow.click();
+    const modRow2 = page.locator('#diff-output [data-preview-line][data-marker="?"]').first();
+    await expect(modRow2).toBeVisible();
     await modRow2.locator('button').nth(1).click();
 
     const persistedRow2 = preview.locator('[data-preview-line][data-marker="~"]').first();
     await expect(persistedRow2).toBeVisible();
-    await expect(persistedRow2.locator('.diff-seg.diff-add')).toHaveCountGreaterThan(0);
+    expect(await persistedRow2.locator('.diff-seg.diff-add').count()).toBeGreaterThan(0);
     await expect(persistedRow2.locator('.diff-seg.diff-del')).toHaveCount(0);
   });
 });

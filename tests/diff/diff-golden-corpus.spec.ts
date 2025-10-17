@@ -73,7 +73,7 @@ test.describe('Golden Corpus - Visual Validation', () => {
     await expect(preview).toBeVisible();
   });
 
-  test('Changed-only view hides equals, preserves numbering', async ({ page }) => {
+  test('Persisted-only view keeps equals and hides deletions', async ({ page }) => {
     const leftInputText = "same1\nchanged line\nsame2\ndeleted line\nsame3";
     const rightInput = "same1\nmodified line\nsame2\nsame3";
     
@@ -82,24 +82,23 @@ test.describe('Golden Corpus - Visual Validation', () => {
     
     await page.waitForTimeout(100);
     
-    // Enable changed-only view (if toggle exists)
-    const changedOnlyToggle = page.getByTestId('toggle-persisted-only-preview');
-    if (await changedOnlyToggle.isVisible()) {
-      await changedOnlyToggle.click();
+    // Enable persisted-only view (if toggle exists)
+    const persistedOnlyToggle = page.locator('.bp6-switch:has(input[aria-label="Persisted-only preview"]) .bp6-control-indicator');
+    if (await persistedOnlyToggle.isVisible()) {
+      await persistedOnlyToggle.click();
       await page.waitForTimeout(100);
       
-      // Preview should hide "same" lines but maintain original numbering
+      // Preview should keep equals and hide deletions
       const preview = page.locator('#diff-output');
       const previewText = await preview.textContent();
       
-      // Should not contain "same1", "same2", "same3"
-      expect(previewText).not.toContain('same1');
-      expect(previewText).not.toContain('same2');
-      expect(previewText).not.toContain('same3');
-      
-      // Should contain changed/deleted lines with original line numbers
-      expect(previewText).toContain('2'); // changed line
-      expect(previewText).toContain('4'); // deleted line
+      // Equals remain
+      expect(previewText).toContain('same1');
+      expect(previewText).toContain('same2');
+      expect(previewText).toContain('same3');
+
+      // Deletions hidden
+      expect(previewText).not.toContain('deleted line');
     }
   });
 
