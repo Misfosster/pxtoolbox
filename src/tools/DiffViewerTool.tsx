@@ -1,6 +1,7 @@
-﻿import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Card, Switch } from '@blueprintjs/core';
 import ToolShell from '../components/ui/ToolShell';
+import CopyButton from '../components/ui/CopyButton';
 import { useLocalStorageBoolean } from '../components/ui/useLocalStorageBoolean';
 import { normalizeEOL } from '../utils/diff/normalize';
 import { alignLines, splitLinesNoTrailingEmpty } from '../utils/diff/line';
@@ -10,7 +11,7 @@ import { useOverlaySegments } from '../hooks/useOverlaySegments';
 import { useDiffNavigation } from '../hooks/useDiffNavigation';
 import DiffSidePane from '../components/diff/DiffSidePane';
 import UnifiedPreview from '../components/diff/UnifiedPreview';
-import type { ModResolution } from '../utils/diff/stepKey';
+import { stepKeyForMod, type ModResolution } from '../utils/diff/stepKey';
 
 const WHITESPACE_ONLY_RE = /^[\s\u200b\u200c\u200d\ufeff]*$/;
 
@@ -178,6 +179,44 @@ const DiffViewerTool: React.FC = () => {
   }, [debIgnoreWs, rawSteps, rawLeftNums, rawRightNums, rightLines, leftLines]);
 
   const { steps, leftNums, rightNums } = filteredAlignment;
+
+  const mergedText = useMemo(() => {
+    if (!steps.length) {
+      return leftNorm;
+    }
+    const lines: string[] = [];
+    steps.forEach((step) => {
+      if (step.type === 'same') {
+        if (typeof step.i === 'number') {
+          lines.push(leftLines[step.i] ?? '');
+        }
+        return;
+      }
+      if (step.type === 'add') {
+        if (typeof step.j === 'number') {
+          lines.push(rightLines[step.j] ?? '');
+        }
+        return;
+      }
+      if (step.type === 'del') {
+        return;
+      }
+      if (step.type === 'mod') {
+        const i = typeof step.i === 'number' ? step.i : null;
+        const j = typeof step.j === 'number' ? step.j : null;
+        const key = stepKeyForMod(i, j);
+        const resolution = key ? resolutions[key] : undefined;
+        if (resolution === 'keep-altered') {
+          if (j != null) {
+            lines.push(rightLines[j] ?? '');
+          }
+        } else if (i != null) {
+          lines.push(leftLines[i] ?? '');
+        }
+      }
+    });
+    return lines.join('\n');
+  }, [steps, leftLines, rightLines, leftNorm, rightNorm, resolutions]);
 
   // Build inline overlay segments and line roles per side mapped to ACTUAL lines per side (no placeholder rows)
   const { leftOverlayLines, rightOverlayLines } = useOverlaySegments({
@@ -482,7 +521,8 @@ const DiffViewerTool: React.FC = () => {
             />
           </div>
         </div>
-        <div className="card-bottom" style={{ justifyItems: 'start' }}>
+        <div className="card-bottom" style={{ justifyItems: 'start', display: 'flex', gap: 8 }}>
+          <CopyButton text={mergedText} label="Copy merged" ariaLabel="Copy merged text" disabled={!mergedText} />
           <Button icon="eraser" onClick={() => { setLeftText(''); setRightText(''); setLeftCollapsed(false); setRightCollapsed(false); }} disabled={!leftText && !rightText}>Clear</Button>
         </div>
       </Card>

@@ -227,13 +227,13 @@ const DiffSidePane: React.FC<DiffSidePaneProps> = ({
 					minRows={collapsed ? 3 : minRows}
 					maxRows={collapsed ? collapsedMaxRows : undefined}
 					autosize={false}
-					resizable="horizontal"
+					resizable="vertical"
 					spellCheck={spellCheck}
 					style={{
 						paddingLeft: gutterWidth + contentGap,
 						whiteSpace: 'pre-wrap',
 						overflowX: 'hidden',
-						height,
+						minHeight: height,
 						fontFamily:
 							'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
 						tabSize: metrics.tabSize ?? DEFAULT_TAB_SIZE,
