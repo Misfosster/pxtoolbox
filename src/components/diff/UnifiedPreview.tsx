@@ -542,7 +542,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
                                         .filter((seg) => !seg.changed || seg.diffType === 'add')
                                         .map((seg) => ({ ...seg, diffType: seg.changed ? 'add' : undefined } as LocalSeg));
                             rowNodes.push(
-                                renderLine(`mod-${idx}-${resolution}`, displayNum, ' ', '', selectedSegments, revert, isFocused, true, true),
+                                renderLine(`mod-${idx}-${resolution}`, displayNum, '~', '', selectedSegments, revert, isFocused, true, true),
                             );
                         } else {
                             // Unresolved preview: show both sides' perspective inside each option
@@ -660,7 +660,7 @@ const UnifiedPreview: React.FC<UnifiedPreviewProps> = ({
                         .map((seg) => seg as LocalSeg);
                     const selectedSegments = resolution === 'keep-original' ? leftDisplay : rightDisplay;
                     rowNodes.push(
-                        renderLine(`mod-${idx}-${resolution}`, displayNum, ' ', '', selectedSegments, revert, isFocused, true, true),
+                        renderLine(`mod-${idx}-${resolution}`, displayNum, '~', '', selectedSegments, revert, isFocused, true, true),
                     );
                     continue;
                 }
